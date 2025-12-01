@@ -130,10 +130,11 @@ jobs:
       LOCAL_DEMO_RUN_SECS: 120
       LOCAL_DEMO_VALIDATORS: 1
       LOCAL_DEMO_EXECUTORS: 1
-      TMPDIR: ${{ runner.temp }}
       NOMOS_CIRCUITS: ${{ github.workspace }}/.tmp/nomos-circuits
     steps:
       - uses: actions/checkout@v4
+      - name: Set temp dir
+        run: echo "TMPDIR=${{ runner.temp }}" >> "$GITHUB_ENV"
       - name: Install system dependencies
         run: |
           set -euo pipefail
