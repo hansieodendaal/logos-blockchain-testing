@@ -1,0 +1,23 @@
+[package]
+categories.workspace  = true
+description.workspace = true
+edition.workspace     = true
+keywords.workspace    = true
+license.workspace     = true
+name                  = "runner-examples"
+readme.workspace      = true
+repository.workspace  = true
+version               = "0.1.0"
+
+[dependencies]
+testing-framework-core           = { workspace = true }
+testing-framework-runner-compose = { workspace = true }
+testing-framework-runner-k8s     = { workspace = true }
+testing-framework-runner-local   = { workspace = true }
+testing-framework-workflows      = { workspace = true }
+tokio                            = { workspace = true, features = ["macros", "net", "rt-multi-thread", "time"] }
+tracing                          = { workspace = true }
+tracing-subscriber               = { version = "0.3", features = ["env-filter", "fmt"] }
+
+[lints]
+workspace = true

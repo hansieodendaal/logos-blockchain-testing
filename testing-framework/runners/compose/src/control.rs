@@ -1,0 +1,59 @@
+use std::path::{Path, PathBuf};
+
+use testing_framework_core::scenario::{DynError, NodeControlHandle};
+use tokio::process::Command;
+
+use crate::{docker::run_docker_command, errors::ComposeRunnerError};
+
+pub async fn restart_compose_service(
+    compose_file: &Path,
+    project_name: &str,
+    service: &str,
+) -> Result<(), ComposeRunnerError> {
+    let mut command = Command::new("docker");
+    command
+        .arg("compose")
+        .arg("-f")
+        .arg(compose_file)
+        .arg("-p")
+        .arg(project_name)
+        .arg("restart")
+        .arg(service);
+
+    let description = "docker compose restart";
+    run_docker_command(
+        command,
+        description,
+        testing_framework_core::adjust_timeout(std::time::Duration::from_secs(120)),
+    )
+    .await
+}
+
+/// Compose-specific node control handle for restarting nodes.
+pub struct ComposeNodeControl {
+    pub(crate) compose_file: PathBuf,
+    pub(crate) project_name: String,
+}
+
+#[async_trait::async_trait]
+impl NodeControlHandle for ComposeNodeControl {
+    async fn restart_validator(&self, index: usize) -> Result<(), DynError> {
+        restart_compose_service(
+            &self.compose_file,
+            &self.project_name,
+            &format!("validator-{index}"),
+        )
+        .await
+        .map_err(|err| format!("validator restart failed: {err}").into())
+    }
+
+    async fn restart_executor(&self, index: usize) -> Result<(), DynError> {
+        restart_compose_service(
+            &self.compose_file,
+            &self.project_name,
+            &format!("executor-{index}"),
+        )
+        .await
+        .map_err(|err| format!("executor restart failed: {err}").into())
+    }
+}

@@ -1,0 +1,163 @@
+# Examples
+
+Concrete scenario shapes that illustrate how to combine topologies, workloads,
+and expectations.
+
+**Runnable examples:** The repo includes complete binaries in `examples/src/bin/`:
+- `local_runner.rs` — Local processes
+- `compose_runner.rs` — Docker Compose (requires `NOMOS_TESTNET_IMAGE` built)
+- `k8s_runner.rs` — Kubernetes (requires cluster access and image loaded)
+
+Run with: `POL_PROOF_DEV_MODE=true cargo run -p runner-examples --bin <name>`
+
+**All runners require `POL_PROOF_DEV_MODE=true`** to avoid expensive proof generation.
+
+**Code patterns** below show how to build scenarios. Wrap these in `#[tokio::test]` functions for integration tests, or `#[tokio::main]` for binaries.
+
+## Simple consensus liveness
+
+Minimal test that validates basic block production:
+
+```rust
+use testing_framework_core::scenario::{Deployer, ScenarioBuilder};
+use testing_framework_runner_local::LocalDeployer;
+use testing_framework_workflows::ScenarioBuilderExt;
+use std::time::Duration;
+
+async fn simple_consensus() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let mut plan = ScenarioBuilder::topology()
+            .network_star()
+            .validators(3)
+            .executors(0)
+            .apply()
+        .expect_consensus_liveness()
+        .with_run_duration(Duration::from_secs(30))
+        .build();
+
+    let deployer = LocalDeployer::default();
+    let runner = deployer.deploy(&plan).await?;
+    let _handle = runner.run(&mut plan).await?;
+    
+    Ok(())
+}
+```
+
+**When to use**: smoke tests for consensus on minimal hardware.
+
+## Transaction workload
+
+Test consensus under transaction load:
+
+```rust
+use testing_framework_core::scenario::{Deployer, ScenarioBuilder};
+use testing_framework_runner_local::LocalDeployer;
+use testing_framework_workflows::ScenarioBuilderExt;
+use std::time::Duration;
+
+async fn transaction_workload() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let mut plan = ScenarioBuilder::topology()
+            .network_star()
+            .validators(2)
+            .executors(0)
+            .apply()
+        .wallets(20)
+        .transactions()
+            .rate(5)
+            .users(10)
+            .apply()
+        .expect_consensus_liveness()
+        .with_run_duration(Duration::from_secs(60))
+        .build();
+
+    let deployer = LocalDeployer::default();
+    let runner = deployer.deploy(&plan).await?;
+    let _handle = runner.run(&mut plan).await?;
+    
+    Ok(())
+}
+```
+
+**When to use**: validate transaction submission and inclusion.
+
+## DA + transaction workload
+
+Combined test stressing both transaction and DA layers:
+
+```rust
+use testing_framework_core::scenario::{Deployer, ScenarioBuilder};
+use testing_framework_runner_local::LocalDeployer;
+use testing_framework_workflows::ScenarioBuilderExt;
+use std::time::Duration;
+
+async fn da_and_transactions() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let mut plan = ScenarioBuilder::topology()
+            .network_star()
+            .validators(3)
+            .executors(2)
+            .apply()
+        .wallets(30)
+        .transactions()
+            .rate(5)
+            .users(15)
+            .apply()
+        .da()
+            .channel_rate(1)
+            .blob_rate(2)
+            .apply()
+        .expect_consensus_liveness()
+        .with_run_duration(Duration::from_secs(90))
+        .build();
+
+    let deployer = LocalDeployer::default();
+    let runner = deployer.deploy(&plan).await?;
+    let _handle = runner.run(&mut plan).await?;
+    
+    Ok(())
+}
+```
+
+**When to use**: end-to-end coverage of transaction and DA layers.
+
+## Chaos resilience
+
+Test system resilience under node restarts:
+
+```rust
+use testing_framework_core::scenario::{Deployer, ScenarioBuilder};
+use testing_framework_runner_compose::ComposeDeployer;
+use testing_framework_workflows::{ScenarioBuilderExt, ChaosBuilderExt};
+use std::time::Duration;
+
+async fn chaos_resilience() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let mut plan = ScenarioBuilder::topology()
+            .network_star()
+            .validators(4)
+            .executors(2)
+            .apply()
+        .enable_node_control()
+        .wallets(20)
+        .transactions()
+            .rate(3)
+            .users(10)
+            .apply()
+        .chaos()
+            .restart()
+            .min_delay(Duration::from_secs(20))
+            .max_delay(Duration::from_secs(40))
+            .target_cooldown(Duration::from_secs(30))
+            .apply()
+        .expect_consensus_liveness()
+        .with_run_duration(Duration::from_secs(120))
+        .build();
+
+    let deployer = ComposeDeployer::default();
+    let runner = deployer.deploy(&plan).await?;
+    let _handle = runner.run(&mut plan).await?;
+    
+    Ok(())
+}
+```
+
+**When to use**: resilience validation and operational readiness drills.
+
+**Note**: Chaos tests require `ComposeDeployer` or another runner with node control support.
