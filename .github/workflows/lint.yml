@@ -237,6 +237,7 @@ jobs:
           echo "NOMOS_EXECUTOR_BIN=/usr/local/bin/nomos-executor" >> "$GITHUB_ENV"
       - name: Stage KZG params for local run
         run: |
+          rm -rf testing-framework/assets/stack/kzgrs_test_params
           mkdir -p testing-framework/assets/stack/kzgrs_test_params
           rsync -a --delete "$NOMOS_CIRCUITS"/ testing-framework/assets/stack/kzgrs_test_params/ || true
       - name: Run local runner smoke (ignored test)
@@ -271,6 +272,7 @@ jobs:
           cp "${BIN_DIR}/nomos-node" testing-framework/assets/stack/bin/
           cp "${BIN_DIR}/nomos-executor" testing-framework/assets/stack/bin/
           cp "${BIN_DIR}/nomos-cli" testing-framework/assets/stack/bin/
+          rm -rf testing-framework/assets/stack/kzgrs_test_params
           mkdir -p testing-framework/assets/stack/kzgrs_test_params
           rsync -a --delete "$NOMOS_CIRCUITS"/ testing-framework/assets/stack/kzgrs_test_params/ || true
 
