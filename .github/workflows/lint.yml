@@ -223,13 +223,14 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: nomos-binaries-linux-amd64
-          path: ${TMPDIR}/nomos-binaries
+          path: ${{ runner.temp }}/nomos-binaries
       - name: Install nomos binaries
         run: |
-          tar -xzf "${TMPDIR}/nomos-binaries/nomos-binaries.tar.gz" -C "${TMPDIR}/nomos-binaries"
-          sudo cp "${TMPDIR}/nomos-binaries/nomos-node" /usr/local/bin/
-          sudo cp "${TMPDIR}/nomos-binaries/nomos-executor" /usr/local/bin/
-          sudo cp "${TMPDIR}/nomos-binaries/nomos-cli" /usr/local/bin/
+          BIN_DIR="${RUNNER_TEMP}/nomos-binaries"
+          tar -xzf "${BIN_DIR}/nomos-binaries.tar.gz" -C "${BIN_DIR}"
+          sudo cp "${BIN_DIR}/nomos-node" /usr/local/bin/
+          sudo cp "${BIN_DIR}/nomos-executor" /usr/local/bin/
+          sudo cp "${BIN_DIR}/nomos-cli" /usr/local/bin/
           sudo chmod +x /usr/local/bin/nomos-node /usr/local/bin/nomos-executor /usr/local/bin/nomos-cli
       - name: Run local runner smoke (ignored test)
         run: |
@@ -254,7 +255,15 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: nomos-binaries-linux-amd64
-          path: testing-framework/assets/stack/bin
+          path: ${{ runner.temp }}/nomos-binaries
+      - name: Stage nomos binaries into build context
+        run: |
+          BIN_DIR="${RUNNER_TEMP}/nomos-binaries"
+          tar -xzf "${BIN_DIR}/nomos-binaries.tar.gz" -C "${BIN_DIR}"
+          mkdir -p testing-framework/assets/stack/bin
+          cp "${BIN_DIR}/nomos-node" testing-framework/assets/stack/bin/
+          cp "${BIN_DIR}/nomos-executor" testing-framework/assets/stack/bin/
+          cp "${BIN_DIR}/nomos-cli" testing-framework/assets/stack/bin/
 
       - name: Prune docker to free space
         run: |
