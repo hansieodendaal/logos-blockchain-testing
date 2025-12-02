@@ -63,6 +63,7 @@ jobs:
           cp "${CARGO_TARGET_DIR}/debug/nomos-cli" artifacts/
           tar -czf nomos-binaries.tar.gz -C artifacts .
       - uses: actions/upload-artifact@v4
+        if: env.ACT != 'true'
         with:
           name: nomos-binaries-linux-amd64
           path: nomos-binaries.tar.gz
@@ -221,10 +222,16 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-
       - name: Download prebuilt nomos binaries
+        if: env.ACT != 'true'
         uses: actions/download-artifact@v4
         with:
           name: nomos-binaries-linux-amd64
           path: ${{ runner.temp }}/nomos-binaries
+      - name: Use local nomos binaries (act)
+        if: env.ACT == 'true'
+        run: |
+          mkdir -p "${RUNNER_TEMP}/nomos-binaries"
+          tar -xzf "${GITHUB_WORKSPACE}/nomos-binaries.tar.gz" -C "${RUNNER_TEMP}/nomos-binaries"
       - name: Install nomos binaries
         run: |
           BIN_DIR="${RUNNER_TEMP}/nomos-binaries"
@@ -260,10 +267,16 @@ jobs:
         run: mkdir -p "$TMPDIR"
 
       - name: Download prebuilt nomos binaries
+        if: env.ACT != 'true'
         uses: actions/download-artifact@v4
         with:
           name: nomos-binaries-linux-amd64
           path: ${{ runner.temp }}/nomos-binaries
+      - name: Use local nomos binaries (act)
+        if: env.ACT == 'true'
+        run: |
+          mkdir -p "${RUNNER_TEMP}/nomos-binaries"
+          tar -xzf "${GITHUB_WORKSPACE}/nomos-binaries.tar.gz" -C "${RUNNER_TEMP}/nomos-binaries"
       - name: Stage nomos binaries into build context
         run: |
           BIN_DIR="${RUNNER_TEMP}/nomos-binaries"
