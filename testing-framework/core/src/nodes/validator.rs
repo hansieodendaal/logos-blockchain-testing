@@ -1,5 +1,6 @@
 use std::{
     collections::HashSet,
+    env,
     path::PathBuf,
     process::{Child, Command, Stdio},
     time::Duration,
@@ -29,9 +30,22 @@ use crate::{IS_DEBUG_TRACING, adjust_timeout, nodes::LOGS_PREFIX};
 const BIN_PATH: &str = "target/debug/nomos-node";
 
 fn binary_path() -> PathBuf {
+    if let Some(path) = env::var_os("NOMOS_NODE_BIN") {
+        return PathBuf::from(path);
+    }
+    if let Some(path) = which_on_path("nomos-node") {
+        return path;
+    }
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../")
         .join(BIN_PATH)
+}
+
+fn which_on_path(bin: &str) -> Option<PathBuf> {
+    let path_env = env::var_os("PATH")?;
+    env::split_paths(&path_env)
+        .map(|p| p.join(bin))
+        .find(|candidate| candidate.is_file())
 }
 
 pub enum Pool {
