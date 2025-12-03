@@ -115,6 +115,15 @@ impl<Caps: Default> Builder<Caps> {
     pub fn topology() -> TopologyConfigurator<Caps> {
         TopologyConfigurator::new(Self::new(TopologyBuilder::new(TopologyConfig::empty())))
     }
+
+    /// Configure topology via a closure and return the scenario builder.
+    #[must_use]
+    pub fn topology_with(
+        f: impl FnOnce(TopologyConfigurator<Caps>) -> TopologyConfigurator<Caps>,
+    ) -> Builder<Caps> {
+        let configurator = Self::topology();
+        f(configurator).apply()
+    }
 }
 
 impl<Caps> Builder<Caps> {

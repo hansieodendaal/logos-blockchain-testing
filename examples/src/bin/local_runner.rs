@@ -47,11 +47,11 @@ async fn run_local_case(
         duration_secs = run_duration.as_secs(),
         "building scenario plan"
     );
-    let mut plan = ScenarioBuilder::topology()
-        .network_star()
-        .validators(validators)
-        .executors(executors)
-        .apply()
+    let mut plan = ScenarioBuilder::topology_with(|t| {
+        t.network_star()
+            .validators(validators)
+            .executors(executors)
+    })
         .wallets(TOTAL_WALLETS)
         .transactions()
             .rate(MIXED_TXS_PER_BLOCK)

@@ -43,11 +43,11 @@ async fn run_compose_case(
         "building scenario plan"
     );
 
-    let mut plan = ScenarioBuilder::topology()
-        .network_star()
-        .validators(validators)
-        .executors(executors)
-        .apply()
+    let mut plan = ScenarioBuilder::topology_with(|t| {
+        t.network_star()
+            .validators(validators)
+            .executors(executors)
+    })
         .enable_node_control()
         .chaos()
             .restart()
