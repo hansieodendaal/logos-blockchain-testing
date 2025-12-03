@@ -225,12 +225,17 @@ jobs:
       - name: Run local runner smoke (ignored test)
         run: |
           NOMOS_TESTS_KEEP_LOGS=true cargo +nightly-2025-09-14 test -p runner-examples --test local_runner_bin_smoke -- --ignored --nocapture
+          if [ -d "${NOMOS_LOG_DIR}" ]; then
+            tar -czf "${RUNNER_TEMP}/local-logs.tgz" -C "$(dirname "${NOMOS_LOG_DIR}")" "$(basename "${NOMOS_LOG_DIR}")"
+            echo "Local logs tar: $(realpath ${RUNNER_TEMP}/local-logs.tgz)"
+            find "${NOMOS_LOG_DIR}" -type f -print
+          fi
       - name: Upload local smoke logs
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: local-smoke-logs
-          path: ${{ env.NOMOS_LOG_DIR }}
+          path: ${{ runner.temp }}/local-logs.tgz
           if-no-files-found: error
 
   compose_smoke:
@@ -399,6 +404,7 @@ jobs:
         with:
           name: compose-mixed-workload-logs
           path: ci-artifacts
+          if-no-files-found: ignore
 
       - name: Cleanup compose containers
         if: always()
