@@ -139,7 +139,7 @@ jobs:
       LOCAL_DEMO_VALIDATORS: 1
       LOCAL_DEMO_EXECUTORS: 1
       NOMOS_CIRCUITS: ${{ github.workspace }}/.tmp/nomos-circuits
-      NOMOS_KZGRS_PARAMS_PATH: ${{ github.workspace }}/.tmp/nomos-circuits
+      NOMOS_KZGRS_PARAMS_PATH: ${{ github.workspace }}/.tmp/nomos-circuits/pol/proving_key.zkey
       CARGO_INCREMENTAL: 0
       CARGO_PROFILE_DEV_DEBUG: 0
       RUSTFLAGS: -C debuginfo=0
