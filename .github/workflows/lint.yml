@@ -246,10 +246,7 @@ jobs:
           if-no-files-found: ignore
 
   compose_smoke:
-    runs-on:
-      - self-hosted
-      - macOS
-      - X64
+    runs-on: ubuntu-latest
     env:
       TMPDIR: ${{ github.workspace }}/.tmp
       NOMOS_CIRCUITS: ${{ github.workspace }}/.tmp/nomos-circuits
@@ -439,7 +436,7 @@ jobs:
         run: |
           MDBOOK_VERSION=0.4.40
           LINKCHECK_VERSION=0.7.7
-          MERMAID_VERSION=0.12.6
+          MERMAID_VERSION=0.14.0
           cargo +nightly-2025-09-14 install --locked mdbook --version ${MDBOOK_VERSION}
           cargo +nightly-2025-09-14 install mdbook-linkcheck --version ${LINKCHECK_VERSION}
           cargo +nightly-2025-09-14 install --locked mdbook-mermaid --version ${MERMAID_VERSION}
