@@ -277,13 +277,6 @@ jobs:
           path: ${{ env.NOMOS_LOG_DIR }}
           if-no-files-found: ignore
 
-  local_smoke_mac:
-    needs: nomos_binaries
-    runs-on:
-      - self-hosted
-      - macOS
-      - X64
-
   compose_smoke:
     needs: nomos_binaries
     runs-on:
