@@ -14,78 +14,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  nomos_binaries:
-    runs-on:
-      - self-hosted
-      - macOS
-      - X64
-    env:
-      NOMOS_CIRCUITS: ${{ github.workspace }}/.tmp/nomos-circuits
-      CARGO_INCREMENTAL: 0
-      CARGO_PROFILE_DEV_DEBUG: 0
-      RUSTFLAGS: -C debuginfo=0
-      CARGO_TARGET_DIR: ${{ github.workspace }}/.tmp/nomos-target
-    steps:
-      - uses: actions/checkout@v4
-      - name: Restore cached nomos binaries
-        id: restore-nomos-bins
-        uses: actions/cache@v4
-        with:
-          path: ${{ github.workspace }}/nomos-binaries.tar.gz
-          key: ${{ runner.os }}-nomos-binaries-${{ env.NOMOS_NODE_REV }}
-      - name: Install system dependencies (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y clang llvm-dev libclang-dev pkg-config cmake libssl-dev rsync libgmp10 libgmp-dev libgomp1 nasm
-      - name: Install nomos circuits
-        run: |
-          ./scripts/setup-nomos-circuits.sh v0.3.1 "$NOMOS_CIRCUITS"
-          echo "NOMOS_CIRCUITS=$NOMOS_CIRCUITS" >> "$GITHUB_ENV"
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: nightly-2025-09-14
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-
-      - name: Build nomos binaries
-        if: steps.restore-nomos-bins.outputs.cache-hit != 'true'
-        run: |
-          SRC_DIR="${GITHUB_WORKSPACE}/.tmp/nomos-node-src"
-          mkdir -p "$SRC_DIR"
-          if [ ! -d "$SRC_DIR/.git" ]; then
-            git clone https://github.com/logos-co/nomos-node.git "$SRC_DIR"
-          fi
-          cd "$SRC_DIR"
-          git fetch --depth 1 origin "${NOMOS_NODE_REV}"
-          git checkout "${NOMOS_NODE_REV}"
-          git reset --hard
-          git clean -fdx
-          cargo +nightly-2025-09-14 build --all-features -p nomos-node -p nomos-executor -p nomos-cli
-      - name: Package binaries
-        if: steps.restore-nomos-bins.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p artifacts
-          cp "${CARGO_TARGET_DIR}/debug/nomos-node" artifacts/
-          cp "${CARGO_TARGET_DIR}/debug/nomos-executor" artifacts/
-          cp "${CARGO_TARGET_DIR}/debug/nomos-cli" artifacts/
-          tar -czf nomos-binaries.tar.gz -C artifacts .
-      - name: Save nomos binaries cache
-        if: steps.restore-nomos-bins.outputs.cache-hit != 'true'
-        uses: actions/cache@v4
-        with:
-          path: ${{ github.workspace }}/nomos-binaries.tar.gz
-          key: ${{ runner.os }}-nomos-binaries-${{ env.NOMOS_NODE_REV }}
-      - uses: actions/upload-artifact@v4
-        with:
-          name: nomos-binaries-linux-amd64
-          path: nomos-binaries.tar.gz
-
   fmt:
     runs-on: ubuntu-latest
     steps:
@@ -197,7 +125,6 @@ jobs:
       - run: cargo machete
 
   local_smoke:
-    needs: nomos_binaries
     runs-on:
       - self-hosted
       - macOS
@@ -244,11 +171,17 @@ jobs:
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-
-      - name: Download prebuilt nomos binaries
-        uses: actions/download-artifact@v4
+      - name: Restore cached nomos binaries
+        id: restore-nomos-bins
+        uses: actions/cache@v4
         with:
-          name: nomos-binaries-linux-amd64
-          path: ${{ runner.temp }}/nomos-binaries
+          path: ${{ runner.temp }}/nomos-binaries/nomos-binaries.tar.gz
+          key: ${{ runner.os }}-nomos-binaries-${{ env.NOMOS_NODE_REV }}
+      - name: Fail if binaries cache missing
+        if: steps.restore-nomos-bins.outputs.cache-hit != 'true'
+        run: |
+          echo "Nomos binaries cache missing. Run manual build-binaries workflow to publish cache." >&2
+          exit 1
       - name: Install nomos binaries
         run: |
           BIN_DIR="${RUNNER_TEMP}/nomos-binaries"
@@ -278,7 +211,6 @@ jobs:
           if-no-files-found: ignore
 
   compose_smoke:
-    needs: nomos_binaries
     runs-on:
       - self-hosted
       - macOS
@@ -295,11 +227,17 @@ jobs:
       - name: Prepare workspace tmpdir
         run: mkdir -p "$TMPDIR"
 
-      - name: Download prebuilt nomos binaries
-        uses: actions/download-artifact@v4
+      - name: Restore cached nomos binaries
+        id: restore-nomos-bins-compose
+        uses: actions/cache@v4
         with:
-          name: nomos-binaries-linux-amd64
-          path: ${{ runner.temp }}/nomos-binaries
+          path: ${{ runner.temp }}/nomos-binaries/nomos-binaries.tar.gz
+          key: ${{ runner.os }}-nomos-binaries-${{ env.NOMOS_NODE_REV }}
+      - name: Fail if binaries cache missing
+        if: steps.restore-nomos-bins-compose.outputs.cache-hit != 'true'
+        run: |
+          echo "Nomos binaries cache missing. Run manual build-binaries workflow to publish cache." >&2
+          exit 1
       - name: Stage nomos binaries into build context
         run: |
           BIN_DIR="${RUNNER_TEMP}/nomos-binaries"
