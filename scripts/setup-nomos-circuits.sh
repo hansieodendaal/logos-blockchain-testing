@@ -110,7 +110,7 @@ download_release() {
     print_info "URL: $url"
 
     # Build curl command with optional authentication
-    local curl_cmd="curl -L"
+    local curl_cmd="curl -fL --retry 5 --retry-delay 2 --retry-all-errors"
     if [ -n "$GITHUB_TOKEN" ]; then
         curl_cmd="$curl_cmd --header 'authorization: Bearer ${GITHUB_TOKEN}'"
     fi
@@ -125,6 +125,13 @@ download_release() {
     fi
 
     print_success "Download complete"
+
+    # Validate archive before extracting
+    if ! tar -tzf "${temp_dir}/${artifact}" >/dev/null 2>&1; then
+        print_error "Downloaded archive is not a valid tar.gz: ${temp_dir}/${artifact}"
+        rm -rf "$temp_dir"
+        return 1
+    fi
 
     print_info "Extracting to ${INSTALL_DIR}..."
     mkdir -p "$INSTALL_DIR"
