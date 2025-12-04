@@ -1,0 +1,7 @@
+{
+  "config": {
+    "MD013": false, // Line length: allow longer lines in prose and tables.
+    "MD040": false, // Fenced code blocks language: allow language-less fences.
+    "MD060": false  // Table column style: relax spacing requirements.
+  }
+}
