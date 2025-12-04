@@ -175,7 +175,7 @@ jobs:
         id: restore-nomos-bins
         uses: actions/cache@v4
         with:
-          path: ${{ runner.temp }}/nomos-binaries/nomos-binaries.tar.gz
+          path: ${{ github.workspace }}/nomos-binaries.tar.gz
           key: ${{ runner.os }}-nomos-binaries-${{ env.NOMOS_NODE_REV }}-${{ env.NOMOS_BUNDLE_VERSION }}
       - name: Download nomos binaries artifact (fallback)
         if: steps.restore-nomos-bins.outputs.cache-hit != 'true'
@@ -184,32 +184,26 @@ jobs:
           ARTIFACT_NAME: nomos-binaries-${{ runner.os }}-${{ env.NOMOS_NODE_REV }}-${{ env.NOMOS_BUNDLE_VERSION }}
         run: |
           set -euo pipefail
-          mkdir -p "${RUNNER_TEMP}/nomos-binaries"
           artifact_id=$(gh api -X GET "repos/${GITHUB_REPOSITORY}/actions/artifacts" --paginate -F per_page=100 \
             --jq '.artifacts[] | select(.name=="'"${ARTIFACT_NAME}"'") | .id' | head -n1)
           if [ -z "$artifact_id" ]; then
             echo "Nomos binaries cache missing and artifact not found. Run manual build-binaries workflow." >&2
             exit 1
           fi
-          gh api -X GET "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}/zip" > "${RUNNER_TEMP}/nomos-binaries/artifact.zip"
-          unzip -o "${RUNNER_TEMP}/nomos-binaries/artifact.zip" -d "${RUNNER_TEMP}/nomos-binaries"
+          gh api -X GET "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}/zip" > "${GITHUB_WORKSPACE}/artifact.zip"
+          unzip -o "${GITHUB_WORKSPACE}/artifact.zip" -d "${GITHUB_WORKSPACE}"
       - name: Install nomos binaries and circuits
         run: |
+          BIN_TAR="${GITHUB_WORKSPACE}/nomos-binaries.tar.gz"
           BIN_DIR="${RUNNER_TEMP}/nomos-binaries"
-          tar -xzf "${BIN_DIR}/nomos-binaries.tar.gz" -C "${BIN_DIR}"
+          mkdir -p "${BIN_DIR}"
+          tar -xzf "${BIN_TAR}" -C "${BIN_DIR}"
           sudo cp "${BIN_DIR}/nomos-node" /usr/local/bin/
           sudo cp "${BIN_DIR}/nomos-executor" /usr/local/bin/
           sudo cp "${BIN_DIR}/nomos-cli" /usr/local/bin/
           sudo chmod +x /usr/local/bin/nomos-node /usr/local/bin/nomos-executor /usr/local/bin/nomos-cli
           echo "NOMOS_NODE_BIN=/usr/local/bin/nomos-node" >> "$GITHUB_ENV"
           echo "NOMOS_EXECUTOR_BIN=/usr/local/bin/nomos-executor" >> "$GITHUB_ENV"
-          if [ -d "${BIN_DIR}/circuits" ]; then
-            echo "NOMOS_CIRCUITS=${BIN_DIR}/circuits" >> "$GITHUB_ENV"
-            echo "NOMOS_KZGRS_PARAMS_PATH=${BIN_DIR}/circuits/pol/proving_key.zkey" >> "$GITHUB_ENV"
-          else
-            echo "Circuits bundle missing in nomos-binaries tarball" >&2
-            exit 1
-          fi
           if [ -d "${BIN_DIR}/circuits" ]; then
             echo "NOMOS_CIRCUITS=${BIN_DIR}/circuits" >> "$GITHUB_ENV"
             echo "NOMOS_KZGRS_PARAMS_PATH=${BIN_DIR}/circuits/pol/proving_key.zkey" >> "$GITHUB_ENV"
@@ -225,10 +219,15 @@ jobs:
       - name: Run local runner smoke (ignored test)
         run: |
           NOMOS_TESTS_KEEP_LOGS=true cargo +nightly-2025-09-14 test -p runner-examples --test local_runner_bin_smoke -- --ignored --nocapture
+      - name: Archive local smoke logs
+        if: always()
+        run: |
           if [ -d "${NOMOS_LOG_DIR}" ]; then
             tar -czf "${RUNNER_TEMP}/local-logs.tgz" -C "$(dirname "${NOMOS_LOG_DIR}")" "$(basename "${NOMOS_LOG_DIR}")"
             echo "Local logs tar: $(realpath ${RUNNER_TEMP}/local-logs.tgz)"
             find "${NOMOS_LOG_DIR}" -type f -print
+          else
+            echo "No local logs directory at ${NOMOS_LOG_DIR}"
           fi
       - name: Upload local smoke logs
         if: failure()
@@ -256,7 +255,7 @@ jobs:
         id: restore-nomos-bins-compose
         uses: actions/cache@v4
         with:
-          path: ${{ runner.temp }}/nomos-binaries/nomos-binaries.tar.gz
+          path: ${{ github.workspace }}/nomos-binaries.tar.gz
           key: ${{ runner.os }}-nomos-binaries-${{ env.NOMOS_NODE_REV }}-${{ env.NOMOS_BUNDLE_VERSION }}
       - name: Download nomos binaries artifact (fallback)
         if: steps.restore-nomos-bins-compose.outputs.cache-hit != 'true'
@@ -265,19 +264,20 @@ jobs:
           ARTIFACT_NAME: nomos-binaries-${{ runner.os }}-${{ env.NOMOS_NODE_REV }}-${{ env.NOMOS_BUNDLE_VERSION }}
         run: |
           set -euo pipefail
-          mkdir -p "${RUNNER_TEMP}/nomos-binaries"
           artifact_id=$(gh api -X GET "repos/${GITHUB_REPOSITORY}/actions/artifacts" --paginate -F per_page=100 \
             --jq '.artifacts[] | select(.name=="'"${ARTIFACT_NAME}"'") | .id' | head -n1)
           if [ -z "$artifact_id" ]; then
             echo "Nomos binaries cache missing and artifact not found. Run manual build-binaries workflow." >&2
             exit 1
           fi
-          gh api -X GET "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}/zip" > "${RUNNER_TEMP}/nomos-binaries/artifact.zip"
-          unzip -o "${RUNNER_TEMP}/nomos-binaries/artifact.zip" -d "${RUNNER_TEMP}/nomos-binaries"
+          gh api -X GET "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}/zip" > "${GITHUB_WORKSPACE}/artifact.zip"
+          unzip -o "${GITHUB_WORKSPACE}/artifact.zip" -d "${GITHUB_WORKSPACE}"
       - name: Stage nomos binaries into build context
         run: |
+          BIN_TAR="${GITHUB_WORKSPACE}/nomos-binaries.tar.gz"
           BIN_DIR="${RUNNER_TEMP}/nomos-binaries"
-          tar -xzf "${BIN_DIR}/nomos-binaries.tar.gz" -C "${BIN_DIR}"
+          mkdir -p "${BIN_DIR}"
+          tar -xzf "${BIN_TAR}" -C "${BIN_DIR}"
           mkdir -p testing-framework/assets/stack/bin
           cp "${BIN_DIR}/nomos-node" testing-framework/assets/stack/bin/
           cp "${BIN_DIR}/nomos-executor" testing-framework/assets/stack/bin/
@@ -301,18 +301,6 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly-2025-09-14
-      - name: Install system dependencies (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          set -euo pipefail
-          if command -v sudo >/dev/null 2>&1; then
-            sudo apt-get update
-            sudo apt-get install -y clang llvm-dev libclang-dev pkg-config cmake libssl-dev rsync libgmp10 libgmp-dev libgomp1 nasm
-          else
-            apt-get update
-            apt-get install -y clang llvm-dev libclang-dev pkg-config cmake libssl-dev rsync libgmp10 libgmp-dev libgomp1 nasm
-          fi
-
       - name: Install system dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
