@@ -8,7 +8,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   NOMOS_NODE_REV: 2f60a0372c228968c3526c341ebc7e58bbd178dd
-  NOMOS_BUNDLE_VERSION: v3
+  NOMOS_BUNDLE_VERSION: v4
 permissions:
   actions: read
   contents: read
@@ -152,6 +152,10 @@ jobs:
           echo "NOMOS_STATE_DIR=${{ runner.temp }}/nomos-state" >> "$GITHUB_ENV"
           rm -rf "${{ runner.temp }}/local-logs" "${{ runner.temp }}/nomos-state"
           mkdir -p "${{ runner.temp }}/local-logs" "${{ runner.temp }}/nomos-state"
+      - name: Clean workspace caches
+        run: |
+          rm -rf .tmp/nomos-* testing-framework/assets/stack/kzgrs_test_params
+          mkdir -p .tmp
       - name: Install system dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
