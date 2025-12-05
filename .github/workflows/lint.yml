@@ -142,6 +142,7 @@ jobs:
       CARGO_INCREMENTAL: 0
       CARGO_PROFILE_DEV_DEBUG: 0
       RUSTFLAGS: -C debuginfo=0
+      RUST_LOG: info,libp2p_swarm=debug,libp2p_quic=debug
     steps:
       - uses: actions/checkout@v4
       - name: Set temp dir
@@ -240,7 +241,11 @@ jobs:
           LOG_DIR="${NOMOS_LOG_DIR:-${RUNNER_TEMP}/local-logs}"
           if [ -d "$LOG_DIR" ]; then
             echo "Dumping *.log files from $LOG_DIR"
-            find "$LOG_DIR" -maxdepth 2 -type f -name "*.log" -print -exec tail -n 200 {} \;
+            if [ -f "$LOG_DIR/runner.log" ]; then
+              echo "=== runner.log (tail) ==="
+              tail -n 200 "$LOG_DIR/runner.log"
+            fi
+            find "$LOG_DIR" -maxdepth 2 -type f -name "*.log" ! -name "runner.log" -print -exec tail -n 200 {} \;
           else
             echo "No local logs directory at $LOG_DIR"
           fi
