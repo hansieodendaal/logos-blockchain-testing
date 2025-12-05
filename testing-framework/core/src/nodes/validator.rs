@@ -173,6 +173,9 @@ impl Validator {
         let config_path = dir.path().join("validator.yaml");
         let file = std::fs::File::create(&config_path).unwrap();
 
+        // Ensure recovery directory exists so services that persist state do not fail.
+        let _ = std::fs::create_dir_all(dir.path().join("recovery"));
+
         if !*IS_DEBUG_TRACING {
             if let Ok(env_dir) = std::env::var("NOMOS_LOG_DIR") {
                 let log_dir = PathBuf::from(env_dir);
