@@ -7,16 +7,31 @@ use std::{env, path::Path, process::Command};
 #[test]
 #[ignore = "runs local_runner binary (~2min) and requires local assets/binaries"]
 fn local_runner_bin_smoke() {
-    let output = Command::new("cargo")
-        .args([
-            "run",
-            "-p",
-            "runner-examples",
-            "--bin",
-            "local_runner",
-            "--",
-            "--nocapture",
-        ])
+    // Prefer a prebuilt local_runner binary (if provided), otherwise fall back to
+    // cargo run.
+    let runner_bin = env::var("LOCAL_RUNNER_BIN").ok();
+    let mut cmd = match runner_bin.as_deref() {
+        Some(path) => {
+            let mut c = Command::new(path);
+            c.args(["--nocapture"]);
+            c
+        }
+        None => {
+            let mut c = Command::new("cargo");
+            c.args([
+                "run",
+                "-p",
+                "runner-examples",
+                "--bin",
+                "local_runner",
+                "--",
+                "--nocapture",
+            ]);
+            c
+        }
+    };
+
+    let output = cmd
         .env("POL_PROOF_DEV_MODE", "true")
         .env(
             "NOMOS_CIRCUITS",
@@ -31,12 +46,21 @@ fn local_runner_bin_smoke() {
                 })
                 .expect("NOMOS_CIRCUITS must be set or .tmp/nomos-circuits must exist"),
         )
-        .env("LOCAL_DEMO_RUN_SECS", "120")
-        .env("LOCAL_DEMO_VALIDATORS", "1")
-        .env("LOCAL_DEMO_EXECUTORS", "1")
+        .env(
+            "LOCAL_DEMO_RUN_SECS",
+            env::var("LOCAL_DEMO_RUN_SECS").unwrap_or_else(|_| "120".into()),
+        )
+        .env(
+            "LOCAL_DEMO_VALIDATORS",
+            env::var("LOCAL_DEMO_VALIDATORS").unwrap_or_else(|_| "1".into()),
+        )
+        .env(
+            "LOCAL_DEMO_EXECUTORS",
+            env::var("LOCAL_DEMO_EXECUTORS").unwrap_or_else(|_| "1".into()),
+        )
         .env("RUST_BACKTRACE", "1")
         .output()
-        .expect("failed to spawn cargo run");
+        .expect("failed to spawn local runner");
 
     if !output.status.success() {
         panic!(

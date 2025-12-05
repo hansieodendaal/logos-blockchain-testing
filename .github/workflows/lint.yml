@@ -212,6 +212,9 @@ jobs:
             echo "Circuits bundle missing in nomos-binaries tarball" >&2
             exit 1
           fi
+          if [ -f "${BIN_DIR}/local_runner" ]; then
+            echo "LOCAL_RUNNER_BIN=${BIN_DIR}/local_runner" >> "$GITHUB_ENV"
+          fi
       - name: Download KZG params for DA (raw)
         run: |
           mkdir -p "$(dirname "${NOMOS_KZGRS_PARAMS_PATH}")"
@@ -226,7 +229,7 @@ jobs:
           echo "NOMOS_KZGRS_PARAMS_PATH=${GITHUB_WORKSPACE}/testing-framework/assets/stack/kzgrs_test_params/kzgrs_test_params" >> "$GITHUB_ENV"
       - name: Run local runner smoke (ignored test)
         run: |
-          NOMOS_TESTS_KEEP_LOGS=true cargo +nightly-2025-09-14 test -p runner-examples --test local_runner_bin_smoke -- --ignored --nocapture
+          NOMOS_TESTS_KEEP_LOGS=true LOCAL_DEMO_RUN_SECS=60 cargo +nightly-2025-09-14 test -p runner-examples --test local_runner_bin_smoke -- --ignored --nocapture
       - name: Archive local smoke logs
         if: always()
         run: |
