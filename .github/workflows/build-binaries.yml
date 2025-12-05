@@ -22,7 +22,7 @@ jobs:
       NOMOS_CIRCUITS: ${{ github.workspace }}/.tmp/nomos-circuits
       CARGO_INCREMENTAL: 0
       CARGO_PROFILE_DEV_DEBUG: 0
-      RUSTFLAGS: -C debuginfo=0
+      RUSTFLAGS: -C debuginfo=0 --cfg feature="pol-dev-mode"
       CARGO_TARGET_DIR: ${{ github.workspace }}/.tmp/nomos-target
     steps:
       - uses: actions/checkout@v4
@@ -36,6 +36,10 @@ jobs:
         run: |
           ./scripts/setup-nomos-circuits.sh v0.3.1 "$NOMOS_CIRCUITS"
           echo "NOMOS_CIRCUITS=$NOMOS_CIRCUITS" >> "$GITHUB_ENV"
+      - name: Add top-level KZG params file
+        run: |
+          curl -fsSL "https://raw.githubusercontent.com/logos-co/nomos-node/${NOMOS_NODE_REV}/tests/kzgrs/kzgrs_test_params" \
+            -o "${NOMOS_CIRCUITS}/kzgrs_test_params"
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly-2025-09-14
@@ -58,7 +62,7 @@ jobs:
           git checkout "${NOMOS_NODE_REV}"
           git reset --hard
           git clean -fdx
-          cargo +nightly-2025-09-14 build --features "testing,pol-dev-mode" --bins
+          cargo +nightly-2025-09-14 build --features testing --bins
       - name: Package binaries
         run: |
           mkdir -p artifacts
