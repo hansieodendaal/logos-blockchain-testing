@@ -487,13 +487,13 @@ jobs:
       - name: Check links
         run: mdbook-linkcheck -s book
       - name: Upload book artifact for Pages
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v3
         with:
           path: target/book
 
   deploy_book:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: book
     runs-on: ubuntu-latest
     environment:
