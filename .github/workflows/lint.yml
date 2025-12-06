@@ -282,6 +282,7 @@ jobs:
       NOMOS_CIRCUITS: ${{ github.workspace }}/.tmp/nomos-circuits
       NOMOS_TESTNET_IMAGE: nomos-testnet:local
       DOCKER_BUILDKIT: 1
+      CARGO_TARGET_DIR: ${{ runner.temp }}/target-compose
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -354,6 +355,12 @@ jobs:
             apt-get update
             apt-get install -y clang llvm-dev libclang-dev pkg-config cmake libssl-dev rsync libgmp10 libgmp-dev libgomp1 nasm
           fi
+
+      - name: Free disk space for compose build
+        run: |
+          set -euo pipefail
+          sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL || true
+          docker system prune -af --volumes || true
 
       - name: Cache cargo registry
         uses: actions/cache@v4
