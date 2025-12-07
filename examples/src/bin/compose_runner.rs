@@ -14,6 +14,16 @@ const TRANSACTION_WALLETS: usize = 8;
 
 #[tokio::main]
 async fn main() {
+    // Compose containers mount KZG params at /kzgrs_test_params; ensure the
+    // generated configs point there unless the caller overrides explicitly.
+    if std::env::var("NOMOS_KZGRS_PARAMS_PATH").is_err() {
+        // Safe: setting a process-wide environment variable before any threads
+        // or async tasks are spawned.
+        unsafe {
+            std::env::set_var("NOMOS_KZGRS_PARAMS_PATH", "/kzgrs_test_params");
+        }
+    }
+
     tracing_subscriber::fmt::init();
 
     let validators = read_env("COMPOSE_DEMO_VALIDATORS", DEFAULT_VALIDATORS);
