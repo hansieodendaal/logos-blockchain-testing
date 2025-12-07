@@ -199,6 +199,11 @@ impl<'a> ComposeDescriptorBuilder<'a> {
         let (default_image, default_platform) = resolve_image();
         let image = default_image;
         let platform = default_platform;
+        // Prometheus image is x86_64-only on some tags; set platform when on arm hosts.
+        let prometheus_platform = match std::env::consts::ARCH {
+            "aarch64" | "arm64" => Some(String::from("linux/arm64")),
+            _ => None,
+        };
 
         let validators = build_nodes(
             self.topology.validators(),
@@ -219,7 +224,7 @@ impl<'a> ComposeDescriptorBuilder<'a> {
         );
 
         Ok(ComposeDescriptor {
-            prometheus: PrometheusTemplate::new(prometheus_host_port),
+            prometheus: PrometheusTemplate::new(prometheus_host_port, prometheus_platform),
             validators,
             executors,
         })
@@ -230,12 +235,15 @@ impl<'a> ComposeDescriptorBuilder<'a> {
 #[derive(Clone, Debug, Serialize)]
 pub struct PrometheusTemplate {
     host_port: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    platform: Option<String>,
 }
 
 impl PrometheusTemplate {
-    fn new(port: u16) -> Self {
+    fn new(port: u16, platform: Option<String>) -> Self {
         Self {
             host_port: format!("127.0.0.1:{port}:9090"),
+            platform,
         }
     }
 }

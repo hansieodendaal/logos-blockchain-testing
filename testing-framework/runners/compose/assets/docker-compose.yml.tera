@@ -1,7 +1,8 @@
 services:
   prometheus:
     image: prom/prometheus:v3.0.1
-    command:
+{% if prometheus.platform %}    platform: {{ prometheus.platform }}
+{% endif %}    command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.retention.time=7d
       - --web.enable-otlp-receiver
