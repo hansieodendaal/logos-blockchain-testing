@@ -62,8 +62,8 @@ impl ComposeWorkspace {
         }
 
         let kzg_source = repo_root.join("testing-framework/assets/stack/kzgrs_test_params");
+        let target = temp.path().join("kzgrs_test_params");
         if kzg_source.exists() {
-            let target = temp.path().join("kzgrs_test_params");
             if kzg_source.is_dir() {
                 copy_dir_recursive(&kzg_source, &target)?;
             } else {
@@ -71,6 +71,19 @@ impl ComposeWorkspace {
                     format!("copying {} -> {}", kzg_source.display(), target.display())
                 })?;
             }
+        }
+        // Fail fast if the KZG bundle is missing or empty; DA verifier will panic
+        // otherwise.
+        if !target.exists()
+            || fs::read_dir(&target)
+                .ok()
+                .map(|mut it| it.next().is_none())
+                .unwrap_or(true)
+        {
+            anyhow::bail!(
+                "KZG params missing in stack assets (expected files in {})",
+                kzg_source.display()
+            );
         }
 
         Ok(Self { root: temp })
