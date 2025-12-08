@@ -372,16 +372,18 @@ jobs:
         run: npx -y markdownlint-cli2 "book/src/**/*.md"
       - name: Build book
         run: mdbook build book
+      - name: Add .nojekyll
+        run: touch target/book/.nojekyll
       - name: Check links
         run: mdbook-linkcheck -s book
       - name: Upload book artifact for Pages
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         uses: actions/upload-pages-artifact@v3
         with:
           path: target/book
 
   deploy_book:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     needs: book
     runs-on: ubuntu-latest
     environment:
