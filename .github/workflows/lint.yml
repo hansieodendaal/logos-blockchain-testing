@@ -178,79 +178,15 @@ jobs:
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-
-      - name: Restore cached nomos binaries
-        id: restore-nomos-bins
-        uses: actions/cache@v4
-        with:
-          path: ${{ github.workspace }}/nomos-binaries.tar.gz
-          key: ${{ runner.os }}-nomos-binaries-${{ env.NOMOS_NODE_REV }}-${{ env.NOMOS_BUNDLE_VERSION }}
-      - name: Download nomos binaries artifact (fallback)
-        if: steps.restore-nomos-bins.outputs.cache-hit != 'true'
+      - name: Run local demo (scripted)
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ARTIFACT_NAME: nomos-binaries-${{ runner.os }}-${{ env.NOMOS_NODE_REV }}-${{ env.NOMOS_BUNDLE_VERSION }}
+          NOMOS_TESTS_KEEP_LOGS: "true"
+          RUST_LOG: "info"
+          NOMOS_LOG_DIR: "${{ runner.temp }}/local-logs"
         run: |
-          set -euo pipefail
-          artifact_id=$(gh api -X GET "repos/${GITHUB_REPOSITORY}/actions/artifacts" --paginate -F per_page=100 \
-            --jq '.artifacts[] | select(.name=="'"${ARTIFACT_NAME}"'") | .id' | head -n1)
-          if [ -z "$artifact_id" ]; then
-            echo "Nomos binaries cache missing and artifact not found. Run manual build-binaries workflow." >&2
-            exit 1
-          fi
-          gh api -X GET "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}/zip" > "${GITHUB_WORKSPACE}/artifact.zip"
-          unzip -o "${GITHUB_WORKSPACE}/artifact.zip" -d "${GITHUB_WORKSPACE}"
-      - name: Install nomos binaries and circuits
-        run: |
-          BIN_TAR="${GITHUB_WORKSPACE}/nomos-binaries.tar.gz"
-          BIN_DIR="${RUNNER_TEMP}/nomos-binaries"
-          mkdir -p "${BIN_DIR}"
-          tar -xzf "${BIN_TAR}" -C "${BIN_DIR}"
-          sudo cp "${BIN_DIR}/nomos-node" /usr/local/bin/
-          sudo cp "${BIN_DIR}/nomos-executor" /usr/local/bin/
-          sudo cp "${BIN_DIR}/nomos-cli" /usr/local/bin/
-          sudo chmod +x /usr/local/bin/nomos-node /usr/local/bin/nomos-executor /usr/local/bin/nomos-cli
-          echo "NOMOS_NODE_BIN=/usr/local/bin/nomos-node" >> "$GITHUB_ENV"
-          echo "NOMOS_EXECUTOR_BIN=/usr/local/bin/nomos-executor" >> "$GITHUB_ENV"
-          if [ -d "${BIN_DIR}/circuits" ]; then
-            echo "NOMOS_CIRCUITS=${BIN_DIR}/circuits" >> "$GITHUB_ENV"
-          else
-            echo "Circuits bundle missing in nomos-binaries tarball" >&2
-            exit 1
-          fi
-          if [ -f "${BIN_DIR}/local_runner" ]; then
-            echo "LOCAL_RUNNER_BIN=${BIN_DIR}/local_runner" >> "$GITHUB_ENV"
-          fi
-      - name: Download KZG params for DA (raw)
-        run: |
-          mkdir -p "$(dirname "${NOMOS_KZGRS_PARAMS_PATH}")"
-          curl -fsSL "https://raw.githubusercontent.com/logos-co/nomos-node/${NOMOS_NODE_REV}/tests/kzgrs/kzgrs_test_params" \
-            -o "${NOMOS_KZGRS_PARAMS_PATH}"
-      - name: Stage KZG params for local run
-        run: |
-          rm -rf testing-framework/assets/stack/kzgrs_test_params
-          mkdir -p testing-framework/assets/stack/kzgrs_test_params
-          rsync -a --delete "$NOMOS_CIRCUITS"/ testing-framework/assets/stack/kzgrs_test_params/ || true
-          cp "${NOMOS_KZGRS_PARAMS_PATH}" testing-framework/assets/stack/kzgrs_test_params/kzgrs_test_params
-          echo "NOMOS_KZGRS_PARAMS_PATH=${GITHUB_WORKSPACE}/testing-framework/assets/stack/kzgrs_test_params/kzgrs_test_params" >> "$GITHUB_ENV"
-      - name: Run local runner smoke (ignored test)
-        run: |
-          NOMOS_TESTS_KEEP_LOGS=true LOCAL_DEMO_RUN_SECS=60 cargo +nightly-2025-09-14 test --all-features -p runner-examples --test local_runner_bin_smoke -- --ignored --nocapture
-      - name: Show local runner logs (on failure)
+          scripts/run-demo.sh local 60
+      - name: Collect local demo logs (on failure)
         if: failure()
-        run: |
-          LOG_DIR="${NOMOS_LOG_DIR:-${RUNNER_TEMP}/local-logs}"
-          if [ -d "$LOG_DIR" ]; then
-            echo "Dumping *.log files from $LOG_DIR"
-            if [ -f "$LOG_DIR/runner.log" ]; then
-              echo "=== runner.log (tail) ==="
-              tail -n 200 "$LOG_DIR/runner.log"
-            fi
-            find "$LOG_DIR" -maxdepth 2 -type f -name "*.log" ! -name "runner.log" -print -exec tail -n 200 {} \;
-          else
-            echo "No local logs directory at $LOG_DIR"
-          fi
-      - name: Archive local smoke logs
-        if: always()
         run: |
           if [ -d "${NOMOS_LOG_DIR}" ]; then
             tar -czf "${RUNNER_TEMP}/local-logs.tgz" -C "$(dirname "${NOMOS_LOG_DIR}")" "$(basename "${NOMOS_LOG_DIR}")"
@@ -373,7 +309,7 @@ jobs:
           NOMOS_TESTNET_IMAGE: ${{ env.NOMOS_TESTNET_IMAGE }}
           COMPOSE_RUNNER_HOST: "127.0.0.1"
           NOMOS_TIME_BACKEND: "monotonic"
-          NOMOS_KZGRS_PARAMS_PATH: "/kzgrs_test_params/pol/proving_key.zkey"
+          NOMOS_KZGRS_PARAMS_PATH: "/kzgrs_test_params/kzgrs_test_params"
           RUST_BACKTRACE: "1"
           NOMOS_TESTS_TRACING: "true"
           RUST_LOG: "info"
@@ -382,13 +318,13 @@ jobs:
         run: |
           mkdir -p "$TMPDIR"
           # Pre-flight: ensure KZG params exist where compose will mount them.
-          KZG_FILE=testing-framework/assets/stack/kzgrs_test_params/pol/proving_key.zkey
+          KZG_FILE=testing-framework/assets/stack/kzgrs_test_params/kzgrs_test_params
           if [ ! -f "$KZG_FILE" ]; then
             echo "KZG params missing at $KZG_FILE" >&2
             ls -l testing-framework/assets/stack/kzgrs_test_params || true
             exit 1
           fi
-          cargo run -p runner-examples --bin compose_runner -- --nocapture
+          scripts/run-demo.sh compose 60
 
       - name: Collect compose logs
         if: failure()

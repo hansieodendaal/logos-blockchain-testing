@@ -92,7 +92,7 @@ pub fn apply_topology_overrides(
     cfg.global_params_path = if use_kzg_mount {
         // Compose mounts the bundle at /kzgrs_test_params; the proving key lives under
         // pol/.
-        "/kzgrs_test_params/pol/proving_key.zkey".into()
+        "/kzgrs_test_params/kzgrs_test_params".into()
     } else {
         da.global_params_path.clone()
     };

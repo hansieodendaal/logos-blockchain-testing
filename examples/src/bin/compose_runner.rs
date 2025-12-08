@@ -20,7 +20,10 @@ async fn main() {
         // Safe: setting a process-wide environment variable before any threads
         // or async tasks are spawned.
         unsafe {
-            std::env::set_var("NOMOS_KZGRS_PARAMS_PATH", "/kzgrs_test_params");
+            std::env::set_var(
+                "NOMOS_KZGRS_PARAMS_PATH",
+                "/kzgrs_test_params/kzgrs_test_params",
+            );
         }
     }
 

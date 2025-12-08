@@ -94,8 +94,12 @@ if [ ! -x "${HOST_BUNDLE_PATH}/zksign/witness_generator" ]; then
 fi
 
 if [ "$MODE" != "local" ]; then
-  echo "==> Rebuilding testnet image (${IMAGE})"
-  "${ROOT_DIR}/testing-framework/assets/stack/scripts/build_test_image.sh"
+  if [ "${NOMOS_SKIP_IMAGE_BUILD:-0}" = "1" ]; then
+    echo "==> Skipping testnet image rebuild (NOMOS_SKIP_IMAGE_BUILD=1)"
+  else
+    echo "==> Rebuilding testnet image (${IMAGE})"
+    "${ROOT_DIR}/testing-framework/assets/stack/scripts/build_test_image.sh"
+  fi
 fi
 
 if [ "$MODE" = "local" ]; then
