@@ -103,7 +103,7 @@ if [ "$MODE" != "local" ]; then
     echo "==> Skipping testnet image rebuild (NOMOS_SKIP_IMAGE_BUILD=1)"
   else
     echo "==> Rebuilding testnet image (${IMAGE})"
-    "${ROOT_DIR}/testing-framework/assets/stack/scripts/build_test_image.sh"
+    IMAGE_TAG="${IMAGE}" "${ROOT_DIR}/testing-framework/assets/stack/scripts/build_test_image.sh"
   fi
 fi
 
