@@ -53,6 +53,11 @@ if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
   exit 0
 fi
 
+# If a tarball is explicitly provided, ensure it exists before doing work.
+if [ -n "${NOMOS_BINARIES_TAR:-}" ] && [ ! -f "${NOMOS_BINARIES_TAR}" ]; then
+  fail_with_usage "NOMOS_BINARIES_TAR is set but missing: ${NOMOS_BINARIES_TAR}"
+fi
+
 readonly ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 if [ -f "${ROOT_DIR}/versions.env" ]; then
   # shellcheck disable=SC1091
@@ -154,7 +159,10 @@ restore_binaries_from_tar() {
   echo "==> Restoring binaries from ${tar_path}"
   rm -rf "${extract_dir}"
   mkdir -p "${extract_dir}"
-  tar -xzf "$tar_path" -C "${extract_dir}"
+  if ! tar -xzf "$tar_path" -C "${extract_dir}"; then
+    echo "Failed to extract ${tar_path}" >&2
+    return 1
+  fi
   local src="${extract_dir}/artifacts"
   local bin_dst="${ROOT_DIR}/testing-framework/assets/stack/bin"
   local circuits_src="${src}/circuits"
