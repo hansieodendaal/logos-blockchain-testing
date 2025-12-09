@@ -64,5 +64,5 @@ jobs:
           key: ${{ runner.os }}-nomos-binaries-${{ env.VERSION }}-${{ env.NOMOS_BUNDLE_VERSION }}
       - uses: actions/upload-artifact@v4
         with:
-          name: nomos-binaries-linux-${{ env.VERSION }}-${{ env.NOMOS_BUNDLE_VERSION }}
+          name: nomos-binaries-${{ runner.os }}-${{ env.VERSION }}-${{ env.NOMOS_BUNDLE_VERSION }}
           path: .tmp/nomos-binaries-linux-${{ env.VERSION }}.tar.gz
