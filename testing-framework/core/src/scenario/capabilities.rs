@@ -24,5 +24,6 @@ impl RequiresNodeControl for NodeControlCapability {
 #[async_trait]
 pub trait NodeControlHandle: Send + Sync {
     async fn restart_validator(&self, index: usize) -> Result<(), DynError>;
+
     async fn restart_executor(&self, index: usize) -> Result<(), DynError>;
 }

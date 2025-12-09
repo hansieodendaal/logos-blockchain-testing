@@ -21,9 +21,19 @@ async fn main() {
         std::process::exit(1);
     }
 
-    let validators = read_env("LOCAL_DEMO_VALIDATORS", DEFAULT_VALIDATORS);
-    let executors = read_env("LOCAL_DEMO_EXECUTORS", DEFAULT_EXECUTORS);
-    let run_secs = read_env("LOCAL_DEMO_RUN_SECS", DEFAULT_RUN_SECS);
+    let validators = read_env_any(
+        &["NOMOS_DEMO_VALIDATORS", "LOCAL_DEMO_VALIDATORS"],
+        DEFAULT_VALIDATORS,
+    );
+    let executors = read_env_any(
+        &["NOMOS_DEMO_EXECUTORS", "LOCAL_DEMO_EXECUTORS"],
+        DEFAULT_EXECUTORS,
+    );
+    let run_secs = read_env_any(
+        &["NOMOS_DEMO_RUN_SECS", "LOCAL_DEMO_RUN_SECS"],
+        DEFAULT_RUN_SECS,
+    );
+
     info!(
         validators,
         executors, run_secs, "starting local runner demo"
@@ -35,7 +45,6 @@ async fn main() {
     }
 }
 
-#[rustfmt::skip]
 async fn run_local_case(
     validators: usize,
     executors: usize,
@@ -47,39 +56,38 @@ async fn run_local_case(
         duration_secs = run_duration.as_secs(),
         "building scenario plan"
     );
+
     let mut plan = ScenarioBuilder::topology_with(|t| {
-        t.network_star()
-            .validators(validators)
-            .executors(executors)
+        t.network_star().validators(validators).executors(executors)
     })
-        .wallets(TOTAL_WALLETS)
-        .transactions_with(|txs| {
-            txs.rate(MIXED_TXS_PER_BLOCK)
-                .users(TRANSACTION_WALLETS)
-        })
-        .da_with(|da| {
-            da.channel_rate(1)
-                .blob_rate(1)
-        })
-        .with_run_duration(run_duration)
-        .expect_consensus_liveness()
-        .build();
+    .wallets(TOTAL_WALLETS)
+    .transactions_with(|txs| txs.rate(MIXED_TXS_PER_BLOCK).users(TRANSACTION_WALLETS))
+    .da_with(|da| da.channel_rate(1).blob_rate(1))
+    .with_run_duration(run_duration)
+    .expect_consensus_liveness()
+    .build();
 
     let deployer = LocalDeployer::default().with_membership_check(true);
     info!("deploying local nodes");
+
     let runner: Runner = deployer.deploy(&plan).await?;
     info!("running scenario");
+
     runner.run(&mut plan).await.map(|_| ())?;
     info!("scenario complete");
+
     Ok(())
 }
 
-fn read_env<T>(key: &str, default: T) -> T
+fn read_env_any<T>(keys: &[&str], default: T) -> T
 where
     T: std::str::FromStr + Copy,
 {
-    std::env::var(key)
-        .ok()
-        .and_then(|raw| raw.parse::<T>().ok())
+    keys.iter()
+        .find_map(|key| {
+            std::env::var(key)
+                .ok()
+                .and_then(|raw| raw.parse::<T>().ok())
+        })
         .unwrap_or(default)
 }

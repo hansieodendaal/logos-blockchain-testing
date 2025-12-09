@@ -16,9 +16,18 @@ const TRANSACTION_WALLETS: usize = 8;
 async fn main() {
     tracing_subscriber::fmt::init();
 
-    let validators = read_env("K8S_DEMO_VALIDATORS", DEFAULT_VALIDATORS);
-    let executors = read_env("K8S_DEMO_EXECUTORS", DEFAULT_EXECUTORS);
-    let run_secs = read_env("K8S_DEMO_RUN_SECS", DEFAULT_RUN_SECS);
+    let validators = read_env_any(
+        &["NOMOS_DEMO_VALIDATORS", "K8S_DEMO_VALIDATORS"],
+        DEFAULT_VALIDATORS,
+    );
+    let executors = read_env_any(
+        &["NOMOS_DEMO_EXECUTORS", "K8S_DEMO_EXECUTORS"],
+        DEFAULT_EXECUTORS,
+    );
+    let run_secs = read_env_any(
+        &["NOMOS_DEMO_RUN_SECS", "K8S_DEMO_RUN_SECS"],
+        DEFAULT_RUN_SECS,
+    );
     info!(validators, executors, run_secs, "starting k8s runner demo");
 
     if let Err(err) = run_k8s_case(validators, executors, Duration::from_secs(run_secs)).await {
@@ -102,12 +111,15 @@ async fn run_k8s_case(
     Ok(())
 }
 
-fn read_env<T>(key: &str, default: T) -> T
+fn read_env_any<T>(keys: &[&str], default: T) -> T
 where
     T: std::str::FromStr + Copy,
 {
-    std::env::var(key)
-        .ok()
-        .and_then(|raw| raw.parse::<T>().ok())
+    keys.iter()
+        .find_map(|key| {
+            std::env::var(key)
+                .ok()
+                .and_then(|raw| raw.parse::<T>().ok())
+        })
         .unwrap_or(default)
 }

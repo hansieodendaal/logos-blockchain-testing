@@ -29,9 +29,18 @@ async fn main() {
 
     tracing_subscriber::fmt::init();
 
-    let validators = read_env("COMPOSE_DEMO_VALIDATORS", DEFAULT_VALIDATORS);
-    let executors = read_env("COMPOSE_DEMO_EXECUTORS", DEFAULT_EXECUTORS);
-    let run_secs = read_env("COMPOSE_DEMO_RUN_SECS", DEFAULT_RUN_SECS);
+    let validators = read_env_any(
+        &["NOMOS_DEMO_VALIDATORS", "COMPOSE_DEMO_VALIDATORS"],
+        DEFAULT_VALIDATORS,
+    );
+    let executors = read_env_any(
+        &["NOMOS_DEMO_EXECUTORS", "COMPOSE_DEMO_EXECUTORS"],
+        DEFAULT_EXECUTORS,
+    );
+    let run_secs = read_env_any(
+        &["NOMOS_DEMO_RUN_SECS", "COMPOSE_DEMO_RUN_SECS"],
+        DEFAULT_RUN_SECS,
+    );
     info!(
         validators,
         executors, run_secs, "starting compose runner demo"
@@ -101,12 +110,15 @@ async fn run_compose_case(
     runner.run(&mut plan).await.map(|_| ()).map_err(Into::into)
 }
 
-fn read_env<T>(key: &str, default: T) -> T
+fn read_env_any<T>(keys: &[&str], default: T) -> T
 where
     T: std::str::FromStr + Copy,
 {
-    std::env::var(key)
-        .ok()
-        .and_then(|raw| raw.parse::<T>().ok())
+    keys.iter()
+        .find_map(|key| {
+            std::env::var(key)
+                .ok()
+                .and_then(|raw| raw.parse::<T>().ok())
+        })
         .unwrap_or(default)
 }

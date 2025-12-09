@@ -4,11 +4,11 @@ set -euo pipefail
 # All-in-one helper: prepare circuits (Linux + host), rebuild the image, and run
 # the chosen runner binary.
 #
-# Usage: scripts/run-demo.sh [compose|local|k8s] [run-seconds]
+# Usage: scripts/run-demo.sh [options] [compose|local|k8s]
 #   compose -> runs examples/src/bin/compose_runner.rs (default)
 #   local   -> runs examples/src/bin/local_runner.rs
 #   k8s     -> runs examples/src/bin/k8s_runner.rs
-#   run-seconds defaults to 60
+#   run-seconds must be provided via -t/--run-seconds
 #
 # Env overrides:
 #   VERSION                       - circuits version (default v0.3.1)
@@ -17,13 +17,83 @@ set -euo pipefail
 #   NOMOS_CIRCUITS_REBUILD_RAPIDSNARK - set to 1 to force rapidsnark rebuild
 #   NOMOS_NODE_REV                - nomos-node git rev for local binaries (default d2dd5a5084e1daef4032562c77d41de5e4d495f8)
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-MODE="${1:-compose}"
-RUN_SECS="${2:-60}"
-VERSION="${VERSION:-v0.3.1}"
+usage() {
+  cat <<'EOF'
+Usage: scripts/run-demo.sh [options] [compose|local|k8s]
+
+Modes:
+  compose   Run examples/src/bin/compose_runner.rs (default)
+  local     Run examples/src/bin/local_runner.rs
+  k8s       Run examples/src/bin/k8s_runner.rs
+
+Options:
+  -t, --run-seconds N   Duration to run the demo (required)
+  -v, --validators N    Number of validators (required)
+  -e, --executors N     Number of executors (required)
+
+Environment:
+  VERSION                        Circuits version (default v0.3.1)
+  NOMOS_TESTNET_IMAGE            Image tag (default nomos-testnet:local)
+  NOMOS_CIRCUITS_PLATFORM        Override host platform detection
+  NOMOS_CIRCUITS_REBUILD_RAPIDSNARK  Force rapidsnark rebuild
+  NOMOS_NODE_REV                 nomos-node git rev (default d2dd5a5084e1daef4032562c77d41de5e4d495f8)
+  NOMOS_BINARIES_TAR             Path to prebuilt binaries/circuits tarball
+  NOMOS_SKIP_IMAGE_BUILD         Set to 1 to skip rebuilding the compose/k8s image
+EOF
+}
+
+fail_with_usage() {
+  echo "$1" >&2
+  usage
+  exit 1
+}
+
+if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
+  usage
+  exit 0
+fi
+
+readonly ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+readonly DEFAULT_VERSION="v0.3.1"
+readonly DEFAULT_NODE_REV="d2dd5a5084e1daef4032562c77d41de5e4d495f8"
+MODE="compose"
+RUN_SECS_RAW=""
+VERSION="${VERSION:-${DEFAULT_VERSION}}"
 IMAGE="${NOMOS_TESTNET_IMAGE:-nomos-testnet:local}"
-NOMOS_NODE_REV="${NOMOS_NODE_REV:-d2dd5a5084e1daef4032562c77d41de5e4d495f8}"
+NOMOS_NODE_REV="${NOMOS_NODE_REV:-${DEFAULT_NODE_REV}}"
+DEMO_VALIDATORS=""
+DEMO_EXECUTORS=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -h|--help)
+      usage; exit 0 ;;
+    -t|--run-seconds)
+      RUN_SECS_RAW="${2:-}"; shift 2 ;;
+    -v|--validators)
+      DEMO_VALIDATORS="${2:-}"; shift 2 ;;
+    -e|--executors)
+      DEMO_EXECUTORS="${2:-}"; shift 2 ;;
+    compose|local|k8s)
+      MODE="$1"; shift ;;
+    *)
+      # Positional run-seconds fallback for legacy usage
+      if [ -z "${RUN_SECS_RAW_SPECIFIED:-}" ] && [[ "$1" =~ ^[0-9]+$ ]]; then
+        RUN_SECS_RAW="$1"
+        shift
+      else
+        fail_with_usage "Unknown argument: $1"
+      fi
+      ;;
+  esac
+done
 RESTORED_BINARIES=0
+SETUP_OUT=""
+cleanup() {
+  if [ -n "${SETUP_OUT}" ]; then
+    rm -f "${SETUP_OUT}"
+  fi
+}
+trap cleanup EXIT
 
 case "$MODE" in
   compose) BIN="compose_runner" ;;
@@ -31,6 +101,20 @@ case "$MODE" in
   k8s) BIN="k8s_runner" ;;
   *) echo "Unknown mode '$MODE' (use compose|local)" >&2; exit 1 ;;
 esac
+
+if ! [[ "${RUN_SECS_RAW}" =~ ^[0-9]+$ ]] || [ "${RUN_SECS_RAW}" -le 0 ]; then
+  fail_with_usage "run-seconds must be a positive integer (pass -t/--run-seconds)"
+fi
+readonly RUN_SECS="${RUN_SECS_RAW}"
+if [ -n "${DEMO_VALIDATORS}" ] && ! [[ "${DEMO_VALIDATORS}" =~ ^[0-9]+$ ]] ; then
+  fail_with_usage "validators must be a non-negative integer (pass -v/--validators)"
+fi
+if [ -n "${DEMO_EXECUTORS}" ] && ! [[ "${DEMO_EXECUTORS}" =~ ^[0-9]+$ ]] ; then
+  fail_with_usage "executors must be a non-negative integer (pass -e/--executors)"
+fi
+if [ -z "${DEMO_VALIDATORS}" ] || [ -z "${DEMO_EXECUTORS}" ]; then
+  fail_with_usage "validators and executors must be provided via -v/--validators and -e/--executors"
+fi
 
 restore_binaries_from_tar() {
   local tar_path="${NOMOS_BINARIES_TAR:-${ROOT_DIR}/.tmp/nomos-binaries.tar.gz}"
@@ -48,19 +132,22 @@ restore_binaries_from_tar() {
   local circuits_dst="${ROOT_DIR}/testing-framework/assets/stack/kzgrs_test_params"
   if [ -f "${src}/nomos-node" ] && [ -f "${src}/nomos-executor" ] && [ -f "${src}/nomos-cli" ]; then
     mkdir -p "${bin_dst}"
-    cp "${src}/nomos-node" "${bin_dst}/"
-    cp "${src}/nomos-executor" "${bin_dst}/"
-    cp "${src}/nomos-cli" "${bin_dst}/"
+    cp "${src}/nomos-node" "${src}/nomos-executor" "${src}/nomos-cli" "${bin_dst}/"
   else
-    echo "Binaries missing in ${tar_path}; fallback to build-from-source path" >&2
+    echo "Binaries missing in ${tar_path}; fallback to build-from-source path (run build-binaries workflow to populate)" >&2
     return 1
   fi
   if [ -d "${circuits_src}" ] && [ -f "${circuits_src}/kzgrs_test_params" ]; then
     rm -rf "${circuits_dst}"
     mkdir -p "${circuits_dst}"
-    rsync -a --delete "${circuits_src}/" "${circuits_dst}/"
+    if command -v rsync >/dev/null 2>&1; then
+      rsync -a --delete "${circuits_src}/" "${circuits_dst}/"
+    else
+      rm -rf "${circuits_dst:?}/"*
+      cp -a "${circuits_src}/." "${circuits_dst}/"
+    fi
   else
-    echo "Circuits missing in ${tar_path}; fallback to download/build path" >&2
+    echo "Circuits missing in ${tar_path}; fallback to download/build path (run build-binaries workflow to populate)" >&2
     return 1
   fi
   RESTORED_BINARIES=1
@@ -100,6 +187,7 @@ ensure_host_binaries() {
     git checkout "${NOMOS_NODE_REV}"
     git reset --hard
     git clean -fdx
+    echo "-> Compiling host binaries (may take a few minutes)..."
     RUSTFLAGS='--cfg feature="pol-dev-mode"' \
       NOMOS_CIRCUITS="${HOST_BUNDLE_PATH}" \
       cargo build --features "testing" \
@@ -114,7 +202,7 @@ ensure_host_binaries() {
 restore_binaries_from_tar || true
 
 echo "==> Preparing circuits (version ${VERSION})"
-SETUP_OUT="/tmp/nomos-setup-output.$$"
+SETUP_OUT="$(mktemp -t nomos-setup-output.XXXXXX)"
 if [ "${RESTORED_BINARIES}" -ne 1 ]; then
   "${ROOT_DIR}/scripts/setup-circuits-stack.sh" "${VERSION}" </dev/null | tee "$SETUP_OUT"
 else
@@ -127,7 +215,6 @@ if [ -d "${ROOT_DIR}/.tmp/nomos-circuits-host" ]; then
 else
   HOST_BUNDLE_PATH="${ROOT_DIR}/testing-framework/assets/stack/kzgrs_test_params"
 fi
-rm -f "$SETUP_OUT"
 
 # If the host bundle was somehow pruned, repair it once more.
 if [ ! -x "${HOST_BUNDLE_PATH}/zksign/witness_generator" ]; then
@@ -164,6 +251,8 @@ POL_PROOF_DEV_MODE=true \
 NOMOS_TESTNET_IMAGE="${IMAGE}" \
 NOMOS_CIRCUITS="${HOST_BUNDLE_PATH}" \
 NOMOS_KZGRS_PARAMS_PATH="${KZG_PATH}" \
+${DEMO_VALIDATORS:+NOMOS_DEMO_VALIDATORS="${DEMO_VALIDATORS}"} \
+${DEMO_EXECUTORS:+NOMOS_DEMO_EXECUTORS="${DEMO_EXECUTORS}"} \
 COMPOSE_DEMO_RUN_SECS="${RUN_SECS}" \
 LOCAL_DEMO_RUN_SECS="${RUN_SECS}" \
 K8S_DEMO_RUN_SECS="${RUN_SECS}" \

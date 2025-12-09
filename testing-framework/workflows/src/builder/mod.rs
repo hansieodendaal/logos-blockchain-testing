@@ -35,13 +35,16 @@ non_zero_rate_fn!(blob_rate_checked, "blob rate must be non-zero");
 pub trait ScenarioBuilderExt<Caps>: Sized {
     /// Configure a transaction flow workload.
     fn transactions(self) -> TransactionFlowBuilder<Caps>;
+
     /// Configure a transaction flow workload via closure.
     fn transactions_with(
         self,
         f: impl FnOnce(TransactionFlowBuilder<Caps>) -> TransactionFlowBuilder<Caps>,
     ) -> CoreScenarioBuilder<Caps>;
+
     /// Configure a data-availability workload.
     fn da(self) -> DataAvailabilityFlowBuilder<Caps>;
+
     /// Configure a data-availability workload via closure.
     fn da_with(
         self,
@@ -50,6 +53,7 @@ pub trait ScenarioBuilderExt<Caps>: Sized {
     #[must_use]
     /// Attach a consensus liveness expectation.
     fn expect_consensus_liveness(self) -> Self;
+
     #[must_use]
     /// Seed deterministic wallets with total funds split across `users`.
     fn initialize_wallet(self, total_funds: u64, users: usize) -> Self;
@@ -209,6 +213,7 @@ impl<Caps> DataAvailabilityFlowBuilder<Caps> {
 pub trait ChaosBuilderExt: Sized {
     /// Entry point into chaos workloads.
     fn chaos(self) -> ChaosBuilder;
+
     /// Configure chaos via closure.
     fn chaos_with(
         self,
