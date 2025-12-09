@@ -20,6 +20,7 @@ pub struct RunnerAssets {
     pub chart_path: PathBuf,
     pub cfgsync_file: PathBuf,
     pub run_cfgsync_script: PathBuf,
+    pub run_nomos_script: PathBuf,
     pub run_nomos_node_script: PathBuf,
     pub run_nomos_executor_script: PathBuf,
     pub values_file: PathBuf,
@@ -90,6 +91,7 @@ pub fn prepare_assets(topology: &GeneratedTopology) -> Result<RunnerAssets, Asse
         kzg_path,
         chart_path,
         cfgsync_file,
+        run_nomos_script: scripts.run_shared,
         run_cfgsync_script: scripts.run_cfgsync,
         run_nomos_node_script: scripts.run_node,
         run_nomos_executor_script: scripts.run_executor,
@@ -111,6 +113,7 @@ fn render_cfgsync_config(root: &Path, topology: &GeneratedTopology) -> Result<St
 
 struct ScriptPaths {
     run_cfgsync: PathBuf,
+    run_shared: PathBuf,
     run_node: PathBuf,
     run_executor: PathBuf,
 }
@@ -118,10 +121,11 @@ struct ScriptPaths {
 fn validate_scripts(root: &Path) -> Result<ScriptPaths, AssetsError> {
     let scripts_dir = stack_scripts_root(root);
     let run_cfgsync = scripts_dir.join("run_cfgsync.sh");
+    let run_shared = scripts_dir.join("run_nomos.sh");
     let run_node = scripts_dir.join("run_nomos_node.sh");
     let run_executor = scripts_dir.join("run_nomos_executor.sh");
 
-    for path in [&run_cfgsync, &run_node, &run_executor] {
+    for path in [&run_cfgsync, &run_shared, &run_node, &run_executor] {
         if !path.exists() {
             return Err(AssetsError::MissingScript { path: path.clone() });
         }
@@ -129,6 +133,7 @@ fn validate_scripts(root: &Path) -> Result<ScriptPaths, AssetsError> {
 
     Ok(ScriptPaths {
         run_cfgsync,
+        run_shared,
         run_node,
         run_executor,
     })

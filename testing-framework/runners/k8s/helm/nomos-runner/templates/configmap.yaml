@@ -17,6 +17,12 @@ data:
 {{- else }}
 {{ "" | indent 4 }}
 {{- end }}
+  run_nomos.sh: |
+{{- if .Values.scripts.runNomosSh }}
+{{ .Values.scripts.runNomosSh | indent 4 }}
+{{- else }}
+{{ "" | indent 4 }}
+{{- end }}
   run_nomos_node.sh: |
 {{- if .Values.scripts.runNomosNodeSh }}
 {{ .Values.scripts.runNomosNodeSh | indent 4 }}

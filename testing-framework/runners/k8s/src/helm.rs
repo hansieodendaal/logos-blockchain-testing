@@ -75,6 +75,11 @@ pub async fn install_release(
         ))
         .arg("--set-file")
         .arg(format!(
+            "scripts.runNomosSh={}",
+            assets.run_nomos_script.display()
+        ))
+        .arg("--set-file")
+        .arg(format!(
             "scripts.runNomosExecutorSh={}",
             assets.run_nomos_executor_script.display()
         ))

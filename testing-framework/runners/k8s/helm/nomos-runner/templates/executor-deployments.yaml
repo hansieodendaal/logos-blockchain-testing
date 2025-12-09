@@ -52,6 +52,8 @@ spec:
                 path: cfgsync.yaml
               - key: run_cfgsync.sh
                 path: scripts/run_cfgsync.sh
+              - key: run_nomos.sh
+                path: scripts/run_nomos.sh
               - key: run_nomos_executor.sh
                 path: scripts/run_nomos_executor.sh
               - key: run_nomos_node.sh
