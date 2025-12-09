@@ -73,7 +73,7 @@ while [ "$#" -gt 0 ]; do
       DEMO_VALIDATORS="${2:-}"; shift 2 ;;
     -e|--executors)
       DEMO_EXECUTORS="${2:-}"; shift 2 ;;
-    compose|local|k8s)
+    compose|host|k8s)
       MODE="$1"; shift ;;
     *)
       # Positional run-seconds fallback for legacy usage
@@ -97,9 +97,9 @@ trap cleanup EXIT
 
 case "$MODE" in
   compose) BIN="compose_runner" ;;
-  local) BIN="local_runner" ;;
+  host) BIN="local_runner" ;;
   k8s) BIN="k8s_runner" ;;
-  *) echo "Unknown mode '$MODE' (use compose|local)" >&2; exit 1 ;;
+  *) echo "Unknown mode '$MODE' (use compose|host|k8s)" >&2; exit 1 ;;
 esac
 
 if ! [[ "${RUN_SECS_RAW}" =~ ^[0-9]+$ ]] || [ "${RUN_SECS_RAW}" -le 0 ]; then
