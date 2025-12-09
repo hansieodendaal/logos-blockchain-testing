@@ -56,7 +56,4 @@ until /usr/bin/cfgsync-client; do
   sleep "$sleep_seconds"
 done
 
-# Align bootstrap timing with validators to keep configs consistent.
-sed -i "s/prolonged_bootstrap_period: .*/prolonged_bootstrap_period: '3.000000000'/" /config.yaml
-
 exec /usr/bin/nomos-executor /config.yaml
