@@ -16,7 +16,7 @@ use nomos_node::config::{
 use nomos_utils::math::NonNegativeF64;
 
 use crate::{
-    common::kms::key_id_for_preload_backend,
+    nodes::kms::key_id_for_preload_backend,
     topology::configs::blend::GeneralBlendConfig as TopologyBlendConfig,
 };
 

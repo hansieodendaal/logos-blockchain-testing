@@ -26,7 +26,7 @@ use tracing::GeneralTracingConfig;
 use wallet::WalletConfig;
 
 use crate::{
-    common::kms::key_id_for_preload_backend,
+    nodes::kms::key_id_for_preload_backend,
     topology::configs::{
         api::GeneralApiConfig,
         bootstrap::{GeneralBootstrapConfig, SHORT_PROLONGED_BOOTSTRAP_PERIOD},
