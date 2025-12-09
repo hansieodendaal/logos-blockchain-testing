@@ -168,24 +168,56 @@ restore_binaries_from_tar() {
   export RESTORED_BINARIES
 }
 
+host_bin_matches_arch() {
+  local bin_path="$1"
+  if [ ! -x "$bin_path" ]; then
+    return 1
+  fi
+  local info expected
+  info="$(file -b "$bin_path" 2>/dev/null || true)"
+  case "$(uname -m)" in
+    x86_64) expected="x86-64|x86_64" ;;
+    aarch64|arm64) expected="arm64|aarch64" ;;
+    *) expected="" ;;
+  esac
+  if [ -n "$expected" ] && echo "$info" | grep -Eqi "$expected"; then
+    return 0
+  fi
+  return 1
+}
+
 ensure_host_binaries() {
   # Build nomos-node/nomos-executor for the host if not already present.
   HOST_SRC="${ROOT_DIR}/.tmp/nomos-node-host-src"
   HOST_TARGET="${ROOT_DIR}/.tmp/nomos-node-host-target"
   HOST_NODE_BIN_DEFAULT="${HOST_TARGET}/debug/nomos-node"
   HOST_EXEC_BIN_DEFAULT="${HOST_TARGET}/debug/nomos-executor"
+  HOST_ASSET_NODE_BIN="${ROOT_DIR}/testing-framework/assets/stack/bin/nomos-node"
+  HOST_ASSET_EXEC_BIN="${ROOT_DIR}/testing-framework/assets/stack/bin/nomos-executor"
 
   if [ -n "${NOMOS_NODE_BIN:-}" ] && [ -x "${NOMOS_NODE_BIN}" ] && [ -x "${NOMOS_EXECUTOR_BIN:-}" ]; then
-    echo "Using provided host binaries:"
-    echo "  NOMOS_NODE_BIN=${NOMOS_NODE_BIN}"
-    echo "  NOMOS_EXECUTOR_BIN=${NOMOS_EXECUTOR_BIN}"
-    return
+    if host_bin_matches_arch "${NOMOS_NODE_BIN}"; then
+      echo "Using provided host binaries:"
+      echo "  NOMOS_NODE_BIN=${NOMOS_NODE_BIN}"
+      echo "  NOMOS_EXECUTOR_BIN=${NOMOS_EXECUTOR_BIN}"
+      return
+    else
+      echo "Provided NOMOS_NODE_BIN does not match host arch; rebuilding..."
+    fi
   fi
 
-  if [ -x "${HOST_NODE_BIN_DEFAULT}" ] && [ -x "${HOST_EXEC_BIN_DEFAULT}" ]; then
+  if host_bin_matches_arch "${HOST_NODE_BIN_DEFAULT}" && host_bin_matches_arch "${HOST_EXEC_BIN_DEFAULT}"; then
     echo "Host binaries already built at ${HOST_TARGET}"
     NOMOS_NODE_BIN="${HOST_NODE_BIN_DEFAULT}"
     NOMOS_EXECUTOR_BIN="${HOST_EXEC_BIN_DEFAULT}"
+    export NOMOS_NODE_BIN NOMOS_EXECUTOR_BIN
+    return
+  fi
+
+  if [ "${RESTORED_BINARIES}" -eq 1 ] && host_bin_matches_arch "${HOST_ASSET_NODE_BIN}" && host_bin_matches_arch "${HOST_ASSET_EXEC_BIN}"; then
+    echo "Using restored host binaries from bundle"
+    NOMOS_NODE_BIN="${HOST_ASSET_NODE_BIN}"
+    NOMOS_EXECUTOR_BIN="${HOST_ASSET_EXEC_BIN}"
     export NOMOS_NODE_BIN NOMOS_EXECUTOR_BIN
     return
   fi
@@ -223,9 +255,19 @@ else
   echo "Skipping circuits setup; using restored bundle"
 fi
 
-# Prefer the host bundle if it exists; otherwise fall back to Linux bundle.
-if [ -d "${ROOT_DIR}/.tmp/nomos-circuits-host" ]; then
+# When running compose/k8s on macOS, prefer host-installed circuits so the
+# host-side zksign tooling matches the host architecture even if the bundle was
+# restored from a linux tarball.
+if [ "${RESTORED_BINARIES}" -eq 1 ] && [ "$MODE" != "host" ] && [ "$(uname -s)" != "Linux" ]; then
+  "${ROOT_DIR}/scripts/setup-circuits-stack.sh" "${VERSION}" </dev/null | tee -a "$SETUP_OUT"
+fi
+
+# Prefer host-native bundle for host tooling when available; otherwise fall back
+# to the restored circuits location.
+if [ "$(uname -s)" != "Linux" ] && [ -d "${ROOT_DIR}/.tmp/nomos-circuits-host" ]; then
   HOST_BUNDLE_PATH="${ROOT_DIR}/.tmp/nomos-circuits-host"
+elif [ "${RESTORED_BINARIES}" -eq 1 ]; then
+  HOST_BUNDLE_PATH="${ROOT_DIR}/testing-framework/assets/stack/kzgrs_test_params"
 else
   HOST_BUNDLE_PATH="${ROOT_DIR}/testing-framework/assets/stack/kzgrs_test_params"
 fi
