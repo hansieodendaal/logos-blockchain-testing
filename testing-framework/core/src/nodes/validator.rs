@@ -1,6 +1,5 @@
 use std::{
     collections::HashSet,
-    env,
     path::PathBuf,
     process::{Child, Command, Stdio},
     time::Duration,
@@ -25,33 +24,24 @@ use tokio::time::error::Elapsed;
 use tx_service::MempoolMetrics;
 
 use super::{ApiClient, create_tempdir, persist_tempdir, should_persist_tempdir};
-use crate::{IS_DEBUG_TRACING, adjust_timeout, nodes::LOGS_PREFIX};
+use crate::{
+    IS_DEBUG_TRACING, adjust_timeout,
+    nodes::{
+        LOGS_PREFIX,
+        common::binary::{BinaryConfig, BinaryResolver},
+    },
+};
 
 const BIN_PATH: &str = "target/debug/nomos-node";
 
 fn binary_path() -> PathBuf {
-    if let Some(path) = env::var_os("NOMOS_NODE_BIN") {
-        return PathBuf::from(path);
-    }
-    if let Some(path) = which_on_path("nomos-node") {
-        return path;
-    }
-    // Default to the shared bin staging area; fall back to workspace target.
-    let shared_bin = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../testing-framework/assets/stack/bin/nomos-node");
-    if shared_bin.exists() {
-        return shared_bin;
-    }
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../")
-        .join(BIN_PATH)
-}
-
-fn which_on_path(bin: &str) -> Option<PathBuf> {
-    let path_env = env::var_os("PATH")?;
-    env::split_paths(&path_env)
-        .map(|p| p.join(bin))
-        .find(|candidate| candidate.is_file())
+    let cfg = BinaryConfig {
+        env_var: "NOMOS_NODE_BIN",
+        binary_name: "nomos-node",
+        fallback_path: BIN_PATH,
+        shared_bin_subpath: "testing-framework/assets/stack/bin/nomos-node",
+    };
+    BinaryResolver::resolve_path(&cfg)
 }
 
 pub enum Pool {
