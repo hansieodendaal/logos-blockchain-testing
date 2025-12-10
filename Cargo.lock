@@ -7230,14 +7230,12 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "broadcast-service",
  "chain-service",
  "common-http-client",
  "futures",
  "groth16",
  "hex",
  "key-management-system-service",
- "kzgrs-backend",
  "nomos-core",
  "nomos-da-network-core",
  "nomos-da-network-service",
@@ -7261,7 +7259,6 @@ dependencies = [
  "thiserror 2.0.17",
  "tokio",
  "tracing",
- "tx-service",
 ]
 
 [[package]]
