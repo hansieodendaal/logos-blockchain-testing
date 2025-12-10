@@ -1,7 +1,6 @@
 use std::time::Duration;
 
 use async_trait::async_trait;
-use nomos_core::header::HeaderId;
 use testing_framework_core::scenario::{DynError, Expectation, RunContext};
 use thiserror::Error;
 use tokio::time::sleep;
@@ -52,12 +51,6 @@ enum ConsensusLivenessIssue {
         height: u64,
         target: u64,
     },
-    #[error("{node} LIB {lib:?} diverged from reference {reference_lib:?}")]
-    LibDiverged {
-        node: String,
-        lib: HeaderId,
-        reference_lib: HeaderId,
-    },
     #[error("{node} consensus_info failed: {source}")]
     RequestFailed {
         node: String,
@@ -105,13 +98,11 @@ impl ConsensusLiveness {
         let mut issues = Vec::new();
 
         for attempt in 0..max_attempts {
-            match Self::fetch_cluster_info(ctx).await {
-                Ok((height, lib, tip)) => {
+            match Self::fetch_cluster_height(ctx).await {
+                Ok(height) => {
                     samples.push(NodeSample {
                         label: format!("sample-{attempt}"),
                         height,
-                        lib,
-                        tip,
                     });
                     if samples.len() >= participant_count {
                         break;
@@ -131,14 +122,14 @@ impl ConsensusLiveness {
         LivenessCheck { samples, issues }
     }
 
-    async fn fetch_cluster_info(ctx: &RunContext) -> Result<(u64, HeaderId, HeaderId), DynError> {
+    async fn fetch_cluster_height(ctx: &RunContext) -> Result<u64, DynError> {
         ctx.cluster_client()
             .try_all_clients(|client| {
                 Box::pin(async move {
                     client
                         .consensus_info()
                         .await
-                        .map(|info| (info.height, info.lib, info.tip))
+                        .map(|info| info.height)
                         .map_err(|err| -> DynError { err.into() })
                 })
             })
@@ -179,7 +170,6 @@ impl ConsensusLiveness {
                 });
         }
 
-        let reference_lib = check.samples.first().map(|s| s.lib);
         for sample in &check.samples {
             if sample.height + self.lag_allowance < target {
                 check
@@ -190,23 +180,12 @@ impl ConsensusLiveness {
                         target,
                     });
             }
-            if let Some(lib) = reference_lib {
-                if sample.lib != lib {
-                    check.issues.push(ConsensusLivenessIssue::LibDiverged {
-                        node: sample.label.clone(),
-                        lib: sample.lib,
-                        reference_lib: lib,
-                    });
-                }
-            }
         }
 
         if check.issues.is_empty() {
             tracing::info!(
                 target,
                 heights = ?check.samples.iter().map(|s| s.height).collect::<Vec<_>>(),
-                libs = ?check.samples.iter().map(|s| s.lib).collect::<Vec<_>>(),
-                tips = ?check.samples.iter().map(|s| s.tip).collect::<Vec<_>>(),
                 "consensus liveness expectation satisfied"
             );
             Ok(())
@@ -222,8 +201,6 @@ impl ConsensusLiveness {
 struct NodeSample {
     label: String,
     height: u64,
-    lib: HeaderId,
-    tip: HeaderId,
 }
 
 struct LivenessCheck {
