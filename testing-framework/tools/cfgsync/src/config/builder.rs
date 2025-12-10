@@ -2,7 +2,7 @@ use std::{collections::HashMap, net::Ipv4Addr, str::FromStr as _};
 
 use nomos_core::mantle::GenesisTx as _;
 use nomos_libp2p::{Multiaddr, PeerId, ed25519};
-use nomos_tracing_service::{LoggerLayer, MetricsLayer, TracingLayer, TracingSettings};
+use nomos_tracing_service::TracingSettings;
 use nomos_utils::net::get_available_udp_port;
 use rand::{Rng as _, thread_rng};
 use testing_framework_config::topology::configs::{
@@ -14,12 +14,14 @@ use testing_framework_config::topology::configs::{
     da::{DaParams, create_da_configs},
     network::{NetworkParams, create_network_configs},
     time::default_time_config,
-    tracing::GeneralTracingConfig,
     wallet::WalletConfig,
 };
 
 use crate::{
-    config::{kms::create_kms_configs, providers::create_providers, validation::validate_inputs},
+    config::{
+        kms::create_kms_configs, providers::create_providers, tracing::update_tracing_identifier,
+        validation::validate_inputs,
+    },
     host::{Host, HostKind, sort_hosts},
     network::rewrite_initial_peers,
 };
@@ -128,11 +130,8 @@ pub fn create_node_configs(
         blend_config.backend_core.listening_address =
             Multiaddr::from_str(&format!("/ip4/0.0.0.0/udp/{}/quic-v1", host.blend_port)).unwrap();
 
-        // Tracing config.
         let tracing_config =
             update_tracing_identifier(tracing_settings.clone(), host.identifier.clone());
-
-        // Time config
         let time_config = default_time_config();
 
         configured_hosts.insert(
@@ -226,135 +225,4 @@ fn build_peer_ids(ids: &[[u8; 32]]) -> Vec<PeerId> {
             PeerId::from_public_key(&ed25519::Keypair::from(secret).public().into())
         })
         .collect()
-}
-
-fn update_tracing_identifier(
-    settings: TracingSettings,
-    identifier: String,
-) -> GeneralTracingConfig {
-    GeneralTracingConfig {
-        tracing_settings: TracingSettings {
-            logger: match settings.logger {
-                LoggerLayer::Loki(mut config) => {
-                    config.host_identifier.clone_from(&identifier);
-                    LoggerLayer::Loki(config)
-                }
-                other => other,
-            },
-            tracing: match settings.tracing {
-                TracingLayer::Otlp(mut config) => {
-                    config.service_name.clone_from(&identifier);
-                    TracingLayer::Otlp(config)
-                }
-                other @ TracingLayer::None => other,
-            },
-            filter: settings.filter,
-            metrics: match settings.metrics {
-                MetricsLayer::Otlp(mut config) => {
-                    config.host_identifier = identifier;
-                    MetricsLayer::Otlp(config)
-                }
-                other @ MetricsLayer::None => other,
-            },
-            console: settings.console,
-            level: settings.level,
-        },
-    }
-}
-
-#[cfg(test)]
-mod cfgsync_tests {
-    use std::{net::Ipv4Addr, num::NonZero, str::FromStr as _, time::Duration};
-
-    use nomos_da_network_core::swarm::{
-        DAConnectionMonitorSettings, DAConnectionPolicySettings, ReplicationConfig,
-    };
-    use nomos_libp2p::{Multiaddr, Protocol};
-    use nomos_tracing_service::{
-        ConsoleLayer, FilterLayer, LoggerLayer, MetricsLayer, TracingLayer, TracingSettings,
-    };
-    use testing_framework_config::topology::configs::{
-        consensus::ConsensusParams, da::DaParams, wallet::WalletConfig,
-    };
-    use tracing::Level;
-
-    use super::create_node_configs;
-    use crate::host::{Host, HostKind};
-
-    #[test]
-    fn basic_ip_list() {
-        let hosts = (0..10)
-            .map(|i| Host {
-                kind: HostKind::Validator,
-                ip: Ipv4Addr::from_str(&format!("10.1.1.{i}")).unwrap(),
-                identifier: "node".into(),
-                network_port: 3000,
-                da_network_port: 4044,
-                blend_port: 5000,
-                api_port: 18080,
-                testing_http_port: 18081,
-            })
-            .collect();
-
-        let configs = create_node_configs(
-            &ConsensusParams {
-                n_participants: 10,
-                security_param: NonZero::new(10).unwrap(),
-                active_slot_coeff: 0.9,
-            },
-            &DaParams {
-                subnetwork_size: 2,
-                dispersal_factor: 1,
-                num_samples: 1,
-                num_subnets: 2,
-                old_blobs_check_interval: Duration::from_secs(5),
-                blobs_validity_duration: Duration::from_secs(u64::MAX),
-                global_params_path: String::new(),
-                policy_settings: DAConnectionPolicySettings::default(),
-                monitor_settings: DAConnectionMonitorSettings::default(),
-                balancer_interval: Duration::ZERO,
-                redial_cooldown: Duration::ZERO,
-                replication_settings: ReplicationConfig {
-                    seen_message_cache_size: 0,
-                    seen_message_ttl: Duration::ZERO,
-                },
-                subnets_refresh_interval: Duration::from_secs(1),
-                retry_shares_limit: 1,
-                retry_commitments_limit: 1,
-            },
-            &TracingSettings {
-                logger: LoggerLayer::None,
-                tracing: TracingLayer::None,
-                filter: FilterLayer::None,
-                metrics: MetricsLayer::None,
-                console: ConsoleLayer::None,
-                level: Level::DEBUG,
-            },
-            &WalletConfig::default(),
-            None,
-            None,
-            None,
-            hosts,
-        );
-
-        for (host, config) in &configs {
-            let network_port = config.network_config.backend.inner.port;
-            let da_network_port = extract_port(&config.da_config.listening_address);
-            let blend_port = extract_port(&config.blend_config.backend_core.listening_address);
-
-            assert_eq!(network_port, host.network_port);
-            assert_eq!(da_network_port, host.da_network_port);
-            assert_eq!(blend_port, host.blend_port);
-        }
-    }
-
-    fn extract_port(multiaddr: &Multiaddr) -> u16 {
-        multiaddr
-            .iter()
-            .find_map(|protocol| match protocol {
-                Protocol::Udp(port) => Some(port),
-                _ => None,
-            })
-            .unwrap()
-    }
 }
