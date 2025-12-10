@@ -10,7 +10,7 @@ use nomos_core::{
     mantle::GenesisTx as _,
     sdp::{Locator, ServiceType},
 };
-use nomos_libp2p::{Multiaddr, PeerId, Protocol, ed25519};
+use nomos_libp2p::{Multiaddr, PeerId, ed25519};
 use nomos_tracing_service::{LoggerLayer, MetricsLayer, TracingLayer, TracingSettings};
 use nomos_utils::net::get_available_udp_port;
 use rand::{Rng as _, thread_rng};
@@ -30,62 +30,8 @@ use testing_framework_config::topology::configs::{
     wallet::WalletConfig,
 };
 
-const DEFAULT_LIBP2P_NETWORK_PORT: u16 = 3000;
-const DEFAULT_DA_NETWORK_PORT: u16 = 3300;
-const DEFAULT_BLEND_PORT: u16 = 3400;
-const DEFAULT_API_PORT: u16 = 18080;
-
-#[derive(Copy, Clone, Eq, PartialEq, Hash)]
-pub enum HostKind {
-    Validator,
-    Executor,
-}
-
-#[derive(Eq, PartialEq, Hash, Clone)]
-pub struct Host {
-    pub kind: HostKind,
-    pub ip: Ipv4Addr,
-    pub identifier: String,
-    pub network_port: u16,
-    pub da_network_port: u16,
-    pub blend_port: u16,
-    pub api_port: u16,
-    pub testing_http_port: u16,
-}
-
-#[derive(Clone, Copy)]
-pub struct PortOverrides {
-    pub network_port: Option<u16>,
-    pub da_network_port: Option<u16>,
-    pub blend_port: Option<u16>,
-    pub api_port: Option<u16>,
-    pub testing_http_port: Option<u16>,
-}
-
-impl Host {
-    fn from_parts(kind: HostKind, ip: Ipv4Addr, identifier: String, ports: PortOverrides) -> Self {
-        Self {
-            kind,
-            ip,
-            identifier,
-            network_port: ports.network_port.unwrap_or(DEFAULT_LIBP2P_NETWORK_PORT),
-            da_network_port: ports.da_network_port.unwrap_or(DEFAULT_DA_NETWORK_PORT),
-            blend_port: ports.blend_port.unwrap_or(DEFAULT_BLEND_PORT),
-            api_port: ports.api_port.unwrap_or(DEFAULT_API_PORT),
-            testing_http_port: ports.testing_http_port.unwrap_or(DEFAULT_API_PORT + 1),
-        }
-    }
-
-    #[must_use]
-    pub fn validator_from_ip(ip: Ipv4Addr, identifier: String, ports: PortOverrides) -> Self {
-        Self::from_parts(HostKind::Validator, ip, identifier, ports)
-    }
-
-    #[must_use]
-    pub fn executor_from_ip(ip: Ipv4Addr, identifier: String, ports: PortOverrides) -> Self {
-        Self::from_parts(HostKind::Executor, ip, identifier, ports)
-    }
-}
+pub use crate::host::{Host, HostKind, PortOverrides};
+use crate::{host::sort_hosts, network::rewrite_initial_peers};
 
 #[must_use]
 pub fn create_node_configs(
@@ -98,20 +44,7 @@ pub fn create_node_configs(
     blend_ports: Option<Vec<u16>>,
     hosts: Vec<Host>,
 ) -> HashMap<Host, GeneralConfig> {
-    let mut hosts = hosts;
-    hosts.sort_by_key(|host| {
-        let index = host
-            .identifier
-            .rsplit('-')
-            .next()
-            .and_then(|raw| raw.parse::<usize>().ok())
-            .unwrap_or(0);
-        let kind = match host.kind {
-            HostKind::Validator => 0,
-            HostKind::Executor => 1,
-        };
-        (kind, index)
-    });
+    let hosts = sort_hosts(hosts);
 
     assert_eq!(
         hosts.len(),
@@ -308,50 +241,6 @@ fn create_providers(
     providers
 }
 
-fn rewrite_initial_peers(
-    templates: &[Vec<Multiaddr>],
-    original_ports: &[u16],
-    hosts: &[Host],
-    peer_ids: &[PeerId],
-) -> Vec<Vec<Multiaddr>> {
-    templates
-        .iter()
-        .enumerate()
-        .map(|(node_idx, peers)| {
-            peers
-                .iter()
-                .filter_map(|addr| find_matching_host(addr, original_ports))
-                .filter(|&peer_idx| peer_idx != node_idx)
-                .map(|peer_idx| {
-                    Multiaddr::from_str(&format!(
-                        "/ip4/{}/udp/{}/quic-v1/p2p/{}",
-                        hosts[peer_idx].ip, hosts[peer_idx].network_port, peer_ids[peer_idx]
-                    ))
-                    .expect("valid peer multiaddr")
-                })
-                .collect()
-        })
-        .collect()
-}
-
-fn find_matching_host(addr: &Multiaddr, original_ports: &[u16]) -> Option<usize> {
-    extract_udp_port(addr).and_then(|port| {
-        original_ports
-            .iter()
-            .position(|candidate| *candidate == port)
-    })
-}
-
-fn extract_udp_port(addr: &Multiaddr) -> Option<u16> {
-    addr.iter().find_map(|protocol| {
-        if let Protocol::Udp(port) = protocol {
-            Some(port)
-        } else {
-            None
-        }
-    })
-}
-
 fn update_tracing_identifier(
     settings: TracingSettings,
     identifier: String,
@@ -437,7 +326,8 @@ mod cfgsync_tests {
     };
     use tracing::Level;
 
-    use super::{Host, HostKind, create_node_configs};
+    use super::create_node_configs;
+    use crate::host::{Host, HostKind};
 
     #[test]
     fn basic_ip_list() {
