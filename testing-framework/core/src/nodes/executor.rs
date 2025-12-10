@@ -18,7 +18,6 @@ use nomos_executor::config::Config;
 use nomos_http_api_common::paths::{DA_GET_SHARES_COMMITMENTS, MANTLE_METRICS, MEMPOOL_ADD_TX};
 use nomos_network::backends::libp2p::Libp2pInfo;
 use nomos_node::api::testing::handlers::HistoricSamplingRequest;
-use nomos_tracing::logging::local::FileConfig;
 use nomos_tracing_service::LoggerLayer;
 use reqwest::Url;
 pub use testing_framework_config::nodes::executor::create_executor_config;
@@ -31,7 +30,7 @@ use crate::{
         common::{
             binary::{BinaryConfig, BinaryResolver},
             config::{injection::inject_ibd_into_cryptarchia, paths::ensure_recovery_paths},
-            lifecycle::kill::kill_child,
+            lifecycle::{kill::kill_child, spawn::configure_logging},
         },
     },
 };
@@ -78,21 +77,9 @@ impl Executor {
         let _ = ensure_recovery_paths(dir.path());
 
         if !*IS_DEBUG_TRACING {
-            if let Ok(env_dir) = std::env::var("NOMOS_LOG_DIR") {
-                let log_dir = PathBuf::from(env_dir);
-                let _ = std::fs::create_dir_all(&log_dir);
-                config.tracing.logger = LoggerLayer::File(FileConfig {
-                    directory: log_dir,
-                    prefix: Some(LOGS_PREFIX.into()),
-                });
-            } else {
-                // If no explicit log dir is provided, fall back to a tempdir so we can capture
-                // logs.
-                config.tracing.logger = LoggerLayer::File(FileConfig {
-                    directory: dir.path().to_owned(),
-                    prefix: Some(LOGS_PREFIX.into()),
-                });
-            }
+            configure_logging(dir.path(), LOGS_PREFIX, |cfg| {
+                config.tracing.logger = LoggerLayer::File(cfg);
+            });
         }
 
         config.storage.db_path = dir.path().join("db");
