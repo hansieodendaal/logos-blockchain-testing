@@ -7323,6 +7323,7 @@ name = "testing-framework-workflows"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "chain-service",
  "ed25519-dalek",
  "executor-http-client",
  "nomos-core",

@@ -14,6 +14,7 @@ workspace = true
 
 [dependencies]
 async-trait              = "0.1"
+chain-service            = { git = "https://github.com/logos-co/nomos-node", rev = "d2dd5a5084e1daef4032562c77d41de5e4d495f8" }
 ed25519-dalek            = { version = "2.2.0", features = ["rand_core", "serde"] }
 executor-http-client     = { workspace = true }
 nomos-core               = { workspace = true }
@@ -24,3 +25,6 @@ thiserror                = { workspace = true }
 tokio                    = { workspace = true, features = ["macros", "net", "rt-multi-thread", "time"] }
 tracing                  = { workspace = true }
 zksign                   = { workspace = true }
+
+[package.metadata.cargo-machete]
+ignored = ["chain-service"]

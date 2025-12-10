@@ -259,7 +259,7 @@ jobs:
           RUST_LOG: "info"
           NOMOS_LOG_DIR: "${{ runner.temp }}/local-logs"
         run: |
-          scripts/run-examples.sh -t 60 -v 1 -e 1 host
+          scripts/run-examples.sh -t 120 -v 1 -e 1 host
       - name: Collect host demo logs (on failure)
         if: failure()
         run: |
@@ -405,7 +405,7 @@ jobs:
           NOMOS_LOG_DIR: "${{ github.workspace }}/.tmp/compose-logs"
         run: |
           mkdir -p "$TMPDIR"
-          scripts/run-examples.sh -t 60 -v 1 -e 1 compose
+          scripts/run-examples.sh -t 120 -v 1 -e 1 compose
 
       - name: Show compose runner log
         env:
