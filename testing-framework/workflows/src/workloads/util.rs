@@ -16,6 +16,10 @@ pub fn find_channel_op<F>(block: &Block<SignedMantleTx>, matcher: &mut F) -> Opt
 where
     F: FnMut(&Op) -> Option<MsgId>,
 {
+    debug!(
+        txs = block.transactions().len(),
+        "scanning block for channel op"
+    );
     for tx in block.transactions() {
         for op in &tx.mantle_tx().ops {
             if let Some(msg_id) = matcher(op) {

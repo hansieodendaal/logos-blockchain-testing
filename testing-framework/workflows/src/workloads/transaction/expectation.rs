@@ -122,8 +122,13 @@ impl Expectation for TxInclusionExpectation {
                             }
                         }
                     }
-                    Err(broadcast::error::RecvError::Lagged(_)) => {}
-                    Err(broadcast::error::RecvError::Closed) => break,
+                    Err(broadcast::error::RecvError::Lagged(skipped)) => {
+                        tracing::debug!(skipped, "tx inclusion capture lagged");
+                    }
+                    Err(broadcast::error::RecvError::Closed) => {
+                        tracing::debug!("tx inclusion capture feed closed");
+                        break;
+                    }
                 }
             }
             tracing::debug!("tx inclusion capture task exiting");
