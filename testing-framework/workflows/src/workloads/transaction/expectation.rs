@@ -104,6 +104,7 @@ impl Expectation for TxInclusionExpectation {
         tokio::spawn(async move {
             let mut receiver = receiver;
             let genesis_parent = HeaderId::from([0; 32]);
+            tracing::debug!("tx inclusion capture task started");
             loop {
                 match receiver.recv().await {
                     Ok(record) => {
@@ -115,6 +116,7 @@ impl Expectation for TxInclusionExpectation {
                             for note in &tx.mantle_tx().ledger_tx.outputs {
                                 if spawn_accounts.contains(&note.pk) {
                                     spawn_observed.fetch_add(1, Ordering::Relaxed);
+                                    tracing::debug!(pk = ?note.pk, "tx inclusion observed account output");
                                     break;
                                 }
                             }
@@ -124,6 +126,7 @@ impl Expectation for TxInclusionExpectation {
                     Err(broadcast::error::RecvError::Closed) => break,
                 }
             }
+            tracing::debug!("tx inclusion capture task exiting");
         });
 
         self.capture_state = Some(CaptureState {

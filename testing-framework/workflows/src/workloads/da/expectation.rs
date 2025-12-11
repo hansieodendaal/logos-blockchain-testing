@@ -86,8 +86,13 @@ impl Expectation for DaWorkloadExpectation {
                         &inscriptions_for_task,
                         &blobs_for_task,
                     ),
-                    Err(broadcast::error::RecvError::Lagged(_)) => {}
-                    Err(broadcast::error::RecvError::Closed) => break,
+                    Err(broadcast::error::RecvError::Lagged(skipped)) => {
+                        tracing::debug!(skipped, "DA expectation: receiver lagged");
+                    }
+                    Err(broadcast::error::RecvError::Closed) => {
+                        tracing::debug!("DA expectation: block feed closed");
+                        break;
+                    }
                 }
             }
         });

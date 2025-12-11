@@ -74,6 +74,7 @@ impl ScenarioWorkload for Workload {
         for channel_id in self.plan().iter().copied() {
             tracing::info!(channel_id = ?channel_id, "DA workload starting channel flow");
             run_channel_flow(ctx, &mut receiver, channel_id).await?;
+            tracing::info!(channel_id = ?channel_id, "DA workload finished channel flow");
         }
 
         tracing::info!("DA workload completed all channel flows");

@@ -69,9 +69,12 @@ impl RandomRestartWorkload {
             .unwrap_or_else(|| Duration::from_millis(1))
             .as_secs_f64();
         let offset = thread_rng().gen_range(0.0..=spread);
-        self.min_delay
+        let delay = self
+            .min_delay
             .checked_add(Duration::from_secs_f64(offset))
-            .unwrap_or(self.max_delay)
+            .unwrap_or(self.max_delay);
+        tracing::debug!(delay_ms = delay.as_millis(), "chaos restart selected delay");
+        delay
     }
 
     fn initialize_cooldowns(&self, targets: &[Target]) -> HashMap<Target, Instant> {
@@ -99,6 +102,10 @@ impl RandomRestartWorkload {
             {
                 let wait = next_ready.saturating_duration_since(now);
                 if !wait.is_zero() {
+                    tracing::debug!(
+                        wait_ms = wait.as_millis(),
+                        "chaos restart waiting for cooldown"
+                    );
                     sleep(wait).await;
                     continue;
                 }
@@ -111,6 +118,7 @@ impl RandomRestartWorkload {
                 .collect();
 
             if let Some(choice) = available.choose(&mut thread_rng()).copied() {
+                tracing::debug!(?choice, "chaos restart picked target");
                 return choice;
             }
 
@@ -174,7 +182,7 @@ impl Workload for RandomRestartWorkload {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 enum Target {
     Validator(usize),
     Executor(usize),
