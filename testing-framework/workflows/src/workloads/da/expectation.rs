@@ -1,7 +1,11 @@
 use std::{
     collections::{HashMap, HashSet},
     num::NonZeroU64,
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicU64, Ordering},
+    },
+    time::Duration,
 };
 
 use async_trait::async_trait;
@@ -13,7 +17,7 @@ use testing_framework_core::scenario::{BlockRecord, DynError, Expectation, RunCo
 use thiserror::Error;
 use tokio::sync::broadcast;
 
-use super::workload::{planned_blob_count, planned_channel_count, planned_channel_ids};
+use super::workload::{planned_channel_count, planned_channel_ids};
 
 #[derive(Debug)]
 pub struct DaWorkloadExpectation {
@@ -28,7 +32,8 @@ struct CaptureState {
     planned: Arc<HashSet<ChannelId>>,
     inscriptions: Arc<Mutex<HashSet<ChannelId>>>,
     blobs: Arc<Mutex<HashMap<ChannelId, u64>>>,
-    expected_total_blobs: u64,
+    run_blocks: Arc<AtomicU64>,
+    run_duration: Duration,
 }
 
 const MIN_INCLUSION_RATIO: f64 = 0.8;
@@ -37,10 +42,26 @@ const MIN_INCLUSION_RATIO: f64 = 0.8;
 enum DaExpectationError {
     #[error("da workload expectation not started")]
     NotCaptured,
-    #[error("missing inscriptions for {missing:?}")]
-    MissingInscriptions { missing: Vec<ChannelId> },
-    #[error("missing blobs for {missing:?}")]
-    MissingBlobs { missing: Vec<ChannelId> },
+    #[error(
+        "missing inscriptions: observed={observed}/{planned} required={required} missing={missing:?}"
+    )]
+    MissingInscriptions {
+        planned: usize,
+        observed: usize,
+        required: usize,
+        missing: Vec<ChannelId>,
+    },
+    #[error(
+        "missing blobs: observed_total_blobs={observed_total_blobs} expected_total_blobs={expected_total_blobs} required_blobs={required_blobs} channels_with_blobs={channels_with_blobs}/{planned_channels} missing_channels={missing:?}"
+    )]
+    MissingBlobs {
+        expected_total_blobs: u64,
+        observed_total_blobs: u64,
+        required_blobs: u64,
+        planned_channels: usize,
+        channels_with_blobs: usize,
+        missing: Vec<ChannelId>,
+    },
 }
 
 impl DaWorkloadExpectation {
@@ -75,19 +96,42 @@ impl Expectation for DaWorkloadExpectation {
             self.headroom_percent,
         ));
 
-        let expected_total_blobs = planned_blob_count(self.blob_rate_per_block, &ctx.run_metrics());
+        let run_duration = ctx.run_metrics().run_duration();
 
         tracing::info!(
             planned_channels = planned_ids.len(),
             blob_rate_per_block = self.blob_rate_per_block.get(),
             headroom_percent = self.headroom_percent,
-            expected_total_blobs,
+            run_duration_secs = run_duration.as_secs(),
             "DA inclusion expectation starting capture"
         );
 
         let planned = Arc::new(planned_ids.iter().copied().collect::<HashSet<_>>());
         let inscriptions = Arc::new(Mutex::new(HashSet::new()));
         let blobs = Arc::new(Mutex::new(HashMap::new()));
+        let run_blocks = Arc::new(AtomicU64::new(0));
+
+        {
+            let run_blocks = Arc::clone(&run_blocks);
+            let mut receiver = ctx.block_feed().subscribe();
+            tokio::spawn(async move {
+                let timer = tokio::time::sleep(run_duration);
+                tokio::pin!(timer);
+
+                loop {
+                    tokio::select! {
+                        _ = &mut timer => break,
+                        result = receiver.recv() => match result {
+                            Ok(_) => {
+                                run_blocks.fetch_add(1, Ordering::Relaxed);
+                            }
+                            Err(broadcast::error::RecvError::Lagged(_)) => {}
+                            Err(broadcast::error::RecvError::Closed) => break,
+                        }
+                    }
+                }
+            });
+        }
 
         let mut receiver = ctx.block_feed().subscribe();
         let planned_for_task = Arc::clone(&planned);
@@ -118,7 +162,8 @@ impl Expectation for DaWorkloadExpectation {
             planned,
             inscriptions,
             blobs,
-            expected_total_blobs,
+            run_blocks,
+            run_duration,
         });
 
         Ok(())
@@ -140,7 +185,8 @@ impl Expectation for DaWorkloadExpectation {
             missing_channels(&state.planned, &inscriptions)
         };
         let required_inscriptions = minimum_required(planned_total, MIN_INCLUSION_RATIO);
-        if planned_total.saturating_sub(missing_inscriptions.len()) < required_inscriptions {
+        let observed_inscriptions = planned_total.saturating_sub(missing_inscriptions.len());
+        if observed_inscriptions < required_inscriptions {
             tracing::warn!(
                 planned = planned_total,
                 missing = missing_inscriptions.len(),
@@ -148,6 +194,9 @@ impl Expectation for DaWorkloadExpectation {
                 "DA expectation missing inscriptions"
             );
             return Err(DaExpectationError::MissingInscriptions {
+                planned: planned_total,
+                observed: observed_inscriptions,
+                required: required_inscriptions,
                 missing: missing_inscriptions,
             }
             .into());
@@ -157,16 +206,43 @@ impl Expectation for DaWorkloadExpectation {
             let blobs = state.blobs.lock().expect("blob lock poisoned");
             blobs.values().sum::<u64>()
         };
-        let required_blobs = minimum_required_u64(state.expected_total_blobs, MIN_INCLUSION_RATIO);
+
+        let channels_with_blobs: HashSet<ChannelId> = {
+            let blobs = state.blobs.lock().expect("blob lock poisoned");
+            blobs
+                .iter()
+                .filter(|(_, count)| **count > 0)
+                .map(|(channel, _)| *channel)
+                .collect::<HashSet<_>>()
+        };
+
+        let observed_blocks = state.run_blocks.load(Ordering::Relaxed).max(1);
+        let expected_total_blobs = self
+            .blob_rate_per_block
+            .get()
+            .saturating_mul(observed_blocks);
+
+        let missing_blob_channels = missing_channels(&state.planned, &channels_with_blobs);
+        let required_blobs = minimum_required_u64(expected_total_blobs, MIN_INCLUSION_RATIO);
         if observed_total_blobs < required_blobs {
             tracing::warn!(
-                planned = state.expected_total_blobs,
-                observed = observed_total_blobs,
-                required = required_blobs,
+                expected_total_blobs,
+                observed_total_blobs,
+                required_blobs,
+                observed_blocks,
+                run_duration_secs = state.run_duration.as_secs(),
+                missing_blob_channels = missing_blob_channels.len(),
                 "DA expectation missing blobs"
             );
             return Err(DaExpectationError::MissingBlobs {
-                missing: Vec::new(),
+                expected_total_blobs,
+                observed_total_blobs,
+                required_blobs,
+                planned_channels: planned_total,
+                channels_with_blobs: channels_with_blobs.len(),
+                // Best-effort diagnostics: which planned channels never got any
+                // blob included.
+                missing: missing_blob_channels,
             }
             .into());
         }

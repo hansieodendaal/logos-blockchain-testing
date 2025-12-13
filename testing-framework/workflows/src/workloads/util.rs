@@ -7,6 +7,7 @@ use nomos_core::{
         ops::{Op, channel::MsgId},
     },
 };
+use rand::{seq::SliceRandom as _, thread_rng};
 use testing_framework_core::scenario::{DynError, RunContext};
 use tracing::debug;
 
@@ -38,22 +39,35 @@ pub async fn submit_transaction_via_cluster(
     tx: Arc<SignedMantleTx>,
 ) -> Result<(), DynError> {
     let tx_hash = tx.hash();
-    debug!(?tx_hash, "submitting transaction via cluster");
-    ctx.cluster_client()
-        .try_all_clients(|client| {
-            let tx = Arc::clone(&tx);
-            Box::pin(async move {
-                let url = client.base_url().clone();
-                debug!(?tx_hash, %url, "submitting transaction to client");
-                let res = client
-                    .submit_transaction(&tx)
-                    .await
-                    .map_err(|err| -> DynError { err.into() });
-                if res.is_err() {
-                    debug!(?tx_hash, %url, "transaction submission failed");
-                }
-                res
-            })
-        })
-        .await
+    debug!(
+        ?tx_hash,
+        "submitting transaction via cluster (validators first)"
+    );
+
+    let node_clients = ctx.node_clients();
+    let mut validator_clients: Vec<_> = node_clients.validator_clients().iter().collect();
+    let mut executor_clients: Vec<_> = node_clients.executor_clients().iter().collect();
+    validator_clients.shuffle(&mut thread_rng());
+    executor_clients.shuffle(&mut thread_rng());
+
+    let clients = validator_clients.into_iter().chain(executor_clients);
+    let mut last_err = None;
+
+    for client in clients {
+        let url = client.base_url().clone();
+        debug!(?tx_hash, %url, "submitting transaction to client");
+        match client
+            .submit_transaction(&tx)
+            .await
+            .map_err(|err| -> DynError { err.into() })
+        {
+            Ok(()) => return Ok(()),
+            Err(err) => {
+                debug!(?tx_hash, %url, "transaction submission failed");
+                last_err = Some(err);
+            }
+        }
+    }
+
+    Err(last_err.unwrap_or_else(|| "cluster client exhausted all nodes".into()))
 }

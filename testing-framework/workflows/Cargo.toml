@@ -15,7 +15,6 @@ workspace = true
 [dependencies]
 async-trait                   = "0.1"
 chain-service                 = { workspace = true }
-ed25519-dalek                 = { version = "2.2.0", features = ["rand_core", "serde"] }
 executor-http-client          = { workspace = true }
 futures                       = "0.3"
 key-management-system-service = { workspace = true }

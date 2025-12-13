@@ -28,9 +28,10 @@ url                    = { version = "2" }
 uuid                   = { version = "1", features = ["v4"] }
 
 [dev-dependencies]
-groth16               = { workspace = true }
-nomos-core            = { workspace = true }
-nomos-ledger          = { workspace = true }
-nomos-tracing-service = { workspace = true }
-tests                 = { workspace = true }
-zksign                = { workspace = true }
+groth16                       = { workspace = true }
+key-management-system-service = { workspace = true }
+nomos-core                    = { workspace = true }
+nomos-ledger                  = { workspace = true }
+nomos-tracing-service         = { workspace = true }
+tests                         = { workspace = true }
+zksign                        = { workspace = true }

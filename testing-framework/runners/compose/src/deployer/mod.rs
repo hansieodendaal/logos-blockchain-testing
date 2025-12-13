@@ -91,7 +91,7 @@ mod tests {
         host::{Host, PortOverrides},
     };
     use groth16::Fr;
-    use key_management_system_keys::keys::ZkPublicKey;
+    use key_management_system_service::keys::ZkPublicKey;
     use nomos_core::{
         mantle::{GenesisTx as GenesisTxTrait, ledger::NoteId},
         sdp::{ProviderId, ServiceType},

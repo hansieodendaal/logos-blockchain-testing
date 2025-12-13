@@ -6767,7 +6767,6 @@ dependencies = [
  "chain-service",
  "cryptarchia-engine",
  "cryptarchia-sync",
- "ed25519-dalek",
  "groth16",
  "hex",
  "key-management-system-service",
@@ -6795,7 +6794,6 @@ dependencies = [
  "subnetworks-assignations",
  "time",
  "tracing",
- "zksign",
 ]
 
 [[package]]
@@ -6843,6 +6841,7 @@ dependencies = [
  "async-trait",
  "cfgsync",
  "groth16",
+ "key-management-system-service",
  "nomos-core",
  "nomos-ledger",
  "nomos-tracing-service",
@@ -6896,7 +6895,6 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "chain-service",
- "ed25519-dalek",
  "executor-http-client",
  "futures",
  "key-management-system-service",

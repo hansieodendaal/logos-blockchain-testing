@@ -69,7 +69,7 @@ impl Runner {
             return Err(error);
         }
 
-        Self::cooldown(&context).await;
+        Self::settle_before_expectations(&context).await;
 
         if let Err(error) =
             Self::run_expectations(scenario.expectations_mut(), context.as_ref()).await
@@ -104,7 +104,38 @@ impl Runner {
     {
         let mut workloads = Self::spawn_workloads(scenario, context);
         let _ = Self::drive_until_timer(&mut workloads, scenario.duration()).await?;
+
+        // Keep workloads running during the cooldown window so that late
+        // inclusions (especially DA parent-linked ops) still have a chance to
+        // land before expectations evaluate. We still abort everything at the
+        // end of cooldown to prevent leaking tasks across runs.
+        if let Some(cooldown) = Self::cooldown_duration(context.as_ref()) {
+            if !cooldown.is_zero() {
+                if workloads.is_empty() {
+                    sleep(cooldown).await;
+                } else {
+                    let _ = Self::drive_until_timer(&mut workloads, cooldown).await?;
+                }
+            }
+        }
+
         Self::drain_workloads(&mut workloads).await
+    }
+
+    async fn settle_before_expectations(context: &Arc<RunContext>) {
+        // `BlockFeed` polls node storage on an interval. After we abort workloads
+        // we give the feed a moment to catch up with the last blocks that might
+        // include workload operations so expectations evaluate on a more stable
+        // snapshot.
+        let has_node_control = context.node_control().is_some();
+        let hint = context.run_metrics().block_interval_hint();
+        if !has_node_control && hint.is_none() {
+            return;
+        }
+
+        let mut wait = hint.unwrap_or_else(|| Duration::from_secs(1));
+        wait = wait.max(Duration::from_secs(2));
+        sleep(wait).await;
     }
 
     /// Evaluates every registered expectation, aggregating failures so callers
@@ -133,14 +164,6 @@ impl Runner {
         Err(ScenarioError::Expectations(summary.into()))
     }
 
-    async fn cooldown(context: &Arc<RunContext>) {
-        if let Some(wait) = Self::cooldown_duration(context) {
-            if !wait.is_zero() {
-                sleep(wait).await;
-            }
-        }
-    }
-
     fn cooldown_duration(context: &RunContext) -> Option<Duration> {
         let metrics = context.run_metrics();
         let needs_stabilization = context.node_control().is_some();
@@ -149,6 +172,19 @@ impl Runner {
                 return None;
             }
             let mut wait = interval.mul_f64(5.0);
+            // Expectations observe blocks via `BlockFeed`, which ultimately
+            // follows the chain information returned by `consensus_info`.
+            // When the consensus uses a security parameter (finality depth),
+            // newly included operations can take ~k blocks to show up in the
+            // observable chain. Short smoke runs otherwise end up evaluating
+            // before finality catches up, systematically failing inclusion
+            // expectations (especially for DA, where ops are parent-linked).
+            let security_param = context
+                .descriptors()
+                .config()
+                .consensus_params
+                .security_param;
+            wait = wait.max(interval.mul_f64(security_param.get() as f64));
             if needs_stabilization {
                 let minimum = Duration::from_secs(30);
                 wait = wait.max(minimum);

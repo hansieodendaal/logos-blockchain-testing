@@ -1,18 +1,20 @@
 use std::{num::NonZeroU64, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
-use ed25519_dalek::SigningKey;
 use executor_http_client::ExecutorHttpClient;
 use futures::future::try_join_all;
-use key_management_system_service::keys::Ed25519PublicKey;
+use key_management_system_service::keys::{Ed25519Key, Ed25519PublicKey};
 use nomos_core::{
     da::BlobId,
-    mantle::ops::{
-        Op,
-        channel::{ChannelId, MsgId},
+    mantle::{
+        AuthenticatedMantleTx as _,
+        ops::{
+            Op,
+            channel::{ChannelId, MsgId},
+        },
     },
 };
-use rand::{Rng as _, RngCore as _, seq::SliceRandom as _, thread_rng};
+use rand::{RngCore as _, seq::SliceRandom as _, thread_rng};
 use testing_framework_core::{
     nodes::ApiClient,
     scenario::{
@@ -30,8 +32,7 @@ use crate::{
 const TEST_KEY_BYTES: [u8; 32] = [0u8; 32];
 const DEFAULT_BLOB_RATE_PER_BLOCK: u64 = 1;
 const DEFAULT_CHANNEL_RATE_PER_BLOCK: u64 = 1;
-const MIN_BLOB_CHUNKS: usize = 1;
-const MAX_BLOB_CHUNKS: usize = 8;
+const BLOB_CHUNK_OPTIONS: &[usize] = &[1, 2, 4, 8];
 const PUBLISH_RETRIES: usize = 5;
 const PUBLISH_RETRY_DELAY: Duration = Duration::from_secs(2);
 const DEFAULT_HEADROOM_PERCENT: u64 = 20;
@@ -112,9 +113,8 @@ impl ScenarioWorkload for Workload {
         try_join_all(planned_channels.into_iter().map(|channel_id| {
             let ctx = ctx;
             async move {
-                let mut receiver = ctx.block_feed().subscribe();
                 tracing::info!(channel_id = ?channel_id, blobs = per_channel_target, "DA workload starting channel flow");
-                run_channel_flow(ctx, &mut receiver, channel_id, per_channel_target).await?;
+                run_channel_flow(ctx, channel_id, per_channel_target).await?;
                 tracing::info!(channel_id = ?channel_id, "DA workload finished channel flow");
                 Ok::<(), DynError>(())
             }
@@ -128,22 +128,31 @@ impl ScenarioWorkload for Workload {
 
 async fn run_channel_flow(
     ctx: &RunContext,
-    receiver: &mut broadcast::Receiver<Arc<BlockRecord>>,
     channel_id: ChannelId,
     target_blobs: u64,
 ) -> Result<(), DynError> {
     tracing::debug!(channel_id = ?channel_id, "DA: submitting inscription tx");
-    let tx = Arc::new(tx::create_inscription_transaction_with_id(channel_id));
-    submit_transaction_via_cluster(ctx, Arc::clone(&tx)).await?;
+    let inscription_tx = Arc::new(tx::create_inscription_transaction_with_id(channel_id));
+    submit_transaction_via_cluster(ctx, Arc::clone(&inscription_tx)).await?;
 
-    let inscription_id = wait_for_inscription(receiver, channel_id).await?;
-    tracing::debug!(channel_id = ?channel_id, inscription_id = ?inscription_id, "DA: inscription observed");
+    let mut receiver = ctx.block_feed().subscribe();
+    let inscription_id = wait_for_inscription(&mut receiver, channel_id).await?;
+
     let mut parent_id = inscription_id;
+    for idx in 0..target_blobs {
+        let payload = random_blob_payload();
+        let published_blob_id = publish_blob(ctx, channel_id, parent_id, payload).await?;
+        let (next_parent, included_blob_id) =
+            wait_for_blob_with_parent(&mut receiver, channel_id, parent_id).await?;
+        parent_id = next_parent;
 
-    for _ in 0..target_blobs {
-        let blob_id = publish_blob(ctx, channel_id, parent_id).await?;
-        tracing::debug!(channel_id = ?channel_id, blob_id = ?blob_id, "DA: blob published");
-        parent_id = wait_for_blob(receiver, channel_id, blob_id).await?;
+        tracing::debug!(
+            channel_id = ?channel_id,
+            blob_index = idx,
+            published_blob_id = ?published_blob_id,
+            included_blob_id = ?included_blob_id,
+            "DA: blob published"
+        );
     }
     Ok(())
 }
@@ -164,22 +173,32 @@ async fn wait_for_inscription(
     .await
 }
 
-async fn wait_for_blob(
+async fn wait_for_blob_with_parent(
     receiver: &mut broadcast::Receiver<Arc<BlockRecord>>,
     channel_id: ChannelId,
-    blob_id: BlobId,
-) -> Result<MsgId, DynError> {
-    wait_for_channel_op(receiver, move |op| {
-        if let Op::ChannelBlob(blob_op) = op
-            && blob_op.channel == channel_id
-            && blob_op.blob == blob_id
-        {
-            Some(blob_op.id())
-        } else {
-            None
+    parent_msg: MsgId,
+) -> Result<(MsgId, BlobId), DynError> {
+    loop {
+        match receiver.recv().await {
+            Ok(record) => {
+                for tx in record.block.transactions() {
+                    for op in &tx.mantle_tx().ops {
+                        if let Op::ChannelBlob(blob_op) = op
+                            && blob_op.channel == channel_id
+                            && blob_op.parent == parent_msg
+                        {
+                            let msg_id = blob_op.id();
+                            return Ok((msg_id, blob_op.blob));
+                        }
+                    }
+                }
+            }
+            Err(broadcast::error::RecvError::Lagged(_)) => {}
+            Err(broadcast::error::RecvError::Closed) => {
+                return Err("block feed closed while waiting for channel operations".into());
+            }
         }
-    })
-    .await
+    }
 }
 
 async fn wait_for_channel_op<F>(
@@ -209,16 +228,14 @@ async fn publish_blob(
     ctx: &RunContext,
     channel_id: ChannelId,
     parent_msg: MsgId,
+    data: Vec<u8>,
 ) -> Result<BlobId, DynError> {
     let executors = ctx.node_clients().executor_clients();
     if executors.is_empty() {
         return Err("da workload requires at least one executor".into());
     }
 
-    let signer: Ed25519PublicKey = SigningKey::from_bytes(&TEST_KEY_BYTES)
-        .verifying_key()
-        .into();
-    let data = random_blob_payload();
+    let signer = test_signer();
     tracing::debug!(channel = ?channel_id, payload_bytes = data.len(), "DA: prepared blob payload");
     let client = ExecutorHttpClient::new(None);
 
@@ -248,9 +265,17 @@ async fn publish_blob(
     Err(last_err.unwrap_or_else(|| "da workload could not publish blob".into()))
 }
 
+fn test_signer() -> Ed25519PublicKey {
+    Ed25519Key::from_bytes(&TEST_KEY_BYTES).public_key()
+}
+
 fn random_blob_payload() -> Vec<u8> {
     let mut rng = thread_rng();
-    let chunks = rng.gen_range(MIN_BLOB_CHUNKS..=MAX_BLOB_CHUNKS);
+    // KZGRS encoder expects the polynomial degree to be a power of two, which
+    // effectively constrains the blob chunk count.
+    let chunks = *BLOB_CHUNK_OPTIONS
+        .choose(&mut rng)
+        .expect("non-empty chunk options");
     let mut data = vec![0u8; 31 * chunks];
     rng.fill_bytes(&mut data);
     data

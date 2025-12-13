@@ -16,7 +16,6 @@ chain-network                 = { workspace = true }
 chain-service                 = { workspace = true }
 cryptarchia-engine            = { workspace = true, features = ["serde"] }
 cryptarchia-sync              = { workspace = true }
-ed25519-dalek                 = { version = "2.2.0", features = ["rand_core", "serde"] }
 groth16                       = { workspace = true }
 hex                           = { version = "0.4.3", default-features = false }
 key-management-system-service = { workspace = true }
@@ -44,7 +43,6 @@ serde                         = { workspace = true, features = ["derive"] }
 subnetworks-assignations      = { workspace = true }
 time                          = { version = "0.3", default-features = true }
 tracing                       = { workspace = true }
-zksign                        = { workspace = true }
 
 [lints]
 workspace = true
