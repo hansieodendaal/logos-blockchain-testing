@@ -156,6 +156,7 @@ impl Expectation for TxInclusionExpectation {
                 observed,
                 required,
                 expected = state.expected,
+                min_inclusion_ratio = MIN_INCLUSION_RATIO,
                 "tx inclusion expectation satisfied"
             );
             Ok(())

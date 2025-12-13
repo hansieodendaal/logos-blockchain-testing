@@ -248,9 +248,13 @@ impl Expectation for DaWorkloadExpectation {
         }
 
         tracing::info!(
-            planned = planned_total,
-            inscriptions = planned_total - missing_inscriptions.len(),
-            blobs_observed = observed_total_blobs,
+            planned_channels = planned_total,
+            channels_with_blobs = channels_with_blobs.len(),
+            inscriptions_observed = planned_total - missing_inscriptions.len(),
+            observed_total_blobs,
+            expected_total_blobs,
+            required_blobs,
+            observed_blocks,
             "DA inclusion expectation satisfied"
         );
 
