@@ -95,9 +95,7 @@ impl CleanupGuard for RunnerCleanup {
 
         self.teardown_compose();
 
-        if let Some(mut handle) = self.cfgsync.take() {
-            handle.shutdown();
-        }
+        self.shutdown_cfgsync();
     }
 }
 
@@ -113,5 +111,11 @@ impl RunnerCleanup {
         }
 
         info!("compose preserve flag set; skipping docker compose down");
+    }
+
+    fn shutdown_cfgsync(&mut self) {
+        if let Some(mut handle) = self.cfgsync.take() {
+            handle.shutdown();
+        }
     }
 }

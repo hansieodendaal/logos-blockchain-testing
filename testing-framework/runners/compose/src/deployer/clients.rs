@@ -27,16 +27,19 @@ impl ClientBuilder {
         host: &str,
         environment: &mut StackEnvironment,
     ) -> Result<NodeClients, ComposeRunnerError> {
-        match build_node_clients_with_ports(descriptors, host_ports, host) {
-            Ok(clients) => Ok(clients),
+        let clients = match build_node_clients_with_ports(descriptors, host_ports, host) {
+            Ok(clients) => clients,
             Err(err) => {
-                environment
-                    .fail("failed to construct node api clients")
-                    .await;
-                tracing::warn!(error = ?err, host, "failed to build node clients");
-                Err(err.into())
+                return Err(fail_deploy_step(
+                    environment,
+                    "failed to construct node api clients",
+                    "failed to build node clients",
+                    err,
+                )
+                .await);
             }
-        }
+        };
+        Ok(clients)
     }
 
     pub async fn start_block_feed(
@@ -44,16 +47,33 @@ impl ClientBuilder {
         node_clients: &NodeClients,
         environment: &mut StackEnvironment,
     ) -> Result<(BlockFeed, BlockFeedTask), ComposeRunnerError> {
-        match spawn_block_feed_with_retry(node_clients).await {
-            Ok(pair) => {
-                info!("block feed connected to validator");
-                Ok(pair)
-            }
+        let pair = match spawn_block_feed_with_retry(node_clients).await {
+            Ok(pair) => pair,
             Err(err) => {
-                environment.fail("failed to initialize block feed").await;
-                tracing::warn!(error = ?err, "block feed initialization failed");
-                Err(err)
+                return Err(fail_deploy_step(
+                    environment,
+                    "failed to initialize block feed",
+                    "block feed initialization failed",
+                    err,
+                )
+                .await);
             }
-        }
+        };
+        info!("block feed connected to validator");
+        Ok(pair)
     }
+}
+
+async fn fail_deploy_step<E>(
+    environment: &mut StackEnvironment,
+    reason: &str,
+    log_message: &str,
+    error: E,
+) -> ComposeRunnerError
+where
+    E: std::fmt::Debug + Into<ComposeRunnerError>,
+{
+    environment.fail(reason).await;
+    tracing::warn!(error = ?error, "{log_message}");
+    error.into()
 }
