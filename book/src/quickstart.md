@@ -8,6 +8,7 @@ Get a working example running quickly.
 - This repository cloned
 - Unix-like system (tested on Linux and macOS)
 - For Docker Compose examples: Docker daemon running
+- For Docker Desktop on Apple silicon (compose/k8s): set `NOMOS_BUNDLE_DOCKER_PLATFORM=linux/arm64` to avoid slow/fragile amd64 emulation builds
 - **`versions.env` file** at repository root (defines VERSION, NOMOS_NODE_REV, NOMOS_BUNDLE_VERSION)
 
 **Note:** `nomos-node` binaries are built automatically on demand or can be provided via prebuilt bundles.

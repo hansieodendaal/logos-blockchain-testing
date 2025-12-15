@@ -5,6 +5,11 @@
 - **`POL_PROOF_DEV_MODE=true`** MUST be set for all runners (host, compose, k8s) to avoid expensive Groth16 proof generation that causes timeouts
 - **KZG circuit assets** must be present at `testing-framework/assets/stack/kzgrs_test_params/kzgrs_test_params` (note the repeated filename) for DA workloads
 
+**Platform/Environment Notes:**
+- **macOS + Docker Desktop (Apple silicon):** prefer `NOMOS_BUNDLE_DOCKER_PLATFORM=linux/arm64` for local compose/k8s runs to avoid slow/fragile amd64 emulation builds.
+- **Disk space:** bundle/image builds are storage-heavy. If you see I/O errors or Docker build failures, check free space and prune old artifacts (`.tmp/`, `target/`, and Docker build cache) before retrying.
+- **K8s runner scope:** the default Helm chart mounts KZG params via `hostPath` and uses a local image tag (`logos-blockchain-testing:local`). This is intended for local clusters (Docker Desktop / minikube / kind), not remote managed clusters without additional setup.
+
 **Recommended:** Use `scripts/run-examples.sh` which handles all setup automatically.
 
 ## Quick Symptom Guide
@@ -289,6 +294,7 @@ Run a minimal baseline test (e.g., 2 validators, consensus liveness only). If it
   1. Build bundle: `scripts/build-bundle.sh --platform linux`
   2. Set bundle path: `export NOMOS_BINARIES_TAR=.tmp/nomos-binaries-linux-v0.3.1.tar.gz`
   3. Build image: `testing-framework/assets/stack/scripts/build_test_image.sh`
+  4. **kind/minikube:** load the image into the cluster nodes (e.g. `kind load docker-image logos-blockchain-testing:local`, or `minikube image load ...`), or push to a registry and set `NOMOS_TESTNET_IMAGE` accordingly.
 
 ### "Failed to load KZG parameters" or "Circuit file not found"
 

@@ -67,6 +67,9 @@ This script handles circuit setup, binary building/bundling, image building, and
 - `NOMOS_NODE_REV=<commit>` — nomos-node git revision
 - `NOMOS_BINARIES_TAR=path/to/bundle.tar.gz` — Use prebuilt bundle
 - `NOMOS_SKIP_IMAGE_BUILD=1` — Skip image rebuild (compose/k8s)
+- `NOMOS_BUNDLE_DOCKER_PLATFORM=linux/arm64|linux/amd64` — Docker platform used when building a Linux bundle on non-Linux hosts (macOS/Windows)
+- `COMPOSE_CIRCUITS_PLATFORM=linux-aarch64|linux-x86_64` — Circuits platform used when building the compose/k8s image (defaults based on host arch)
+- `SLOW_TEST_ENV=true` — Doubles built-in readiness timeouts (useful in slower CI / constrained laptops)
 
 ### Host Runner (Direct Cargo Run)
 
@@ -111,6 +114,10 @@ NOMOS_TESTNET_IMAGE=logos-blockchain-testing:local \
 POL_PROOF_DEV_MODE=true \
 cargo run -p runner-examples --bin compose_runner
 ```
+
+**Platform note (macOS / Apple silicon):**
+- Docker Desktop runs a `linux/arm64` engine. If Linux bundle builds are slow/unstable when producing `.tmp/nomos-binaries-linux-*.tar.gz`, prefer `NOMOS_BUNDLE_DOCKER_PLATFORM=linux/arm64` for local compose/k8s runs.
+- If you need amd64 images/binaries specifically (e.g., deploying to amd64-only environments), set `NOMOS_BUNDLE_DOCKER_PLATFORM=linux/amd64` and expect slower builds via emulation.
 
 **Alternative:** Manual circuit/image setup (rebuilds during image build):
 
@@ -394,6 +401,12 @@ cargo run -p runner-examples --bin compose_runner
 # Containers remain running after test—inspect with docker logs or docker exec
 ```
 
+**Compose networking/debug knobs:**
+- `COMPOSE_RUNNER_HOST=127.0.0.1` — host used for readiness probes (override for remote Docker daemons / VM networking)
+- `COMPOSE_RUNNER_HOST_GATEWAY=host.docker.internal:host-gateway` — controls the `extra_hosts` entry injected into compose (set to `disable` to omit)
+- `TESTNET_RUNNER_PRESERVE=1` — alias for `COMPOSE_RUNNER_PRESERVE=1`
+- `COMPOSE_GRAFANA_PORT=<port>` — pin Grafana to a fixed host port instead of ephemeral assignment
+
 **Note:** Container names follow pattern `nomos-compose-{uuid}-validator-{index}-1` where `{uuid}` changes per run.
 
 #### K8s Runner
@@ -424,6 +437,15 @@ kubectl logs -l app=nomos-executor --tail=1000 > all-executors.log
 kubectl logs nomos-validator-0 > validator-0.log
 kubectl logs nomos-executor-1 > executor-1.log
 ```
+
+**K8s environment notes:**
+- The k8s runner is optimized for local clusters (Docker Desktop Kubernetes / minikube / kind):
+  - The default image `logos-blockchain-testing:local` must be available on the cluster’s nodes (Docker Desktop shares the local daemon; kind/minikube often requires an explicit image load step).
+  - The Helm chart mounts KZG params via a `hostPath` to your workspace path; this typically won’t work on remote/managed clusters without replacing it with a PV/CSI volume or baking the params into an image.
+- Debug helpers:
+  - `K8S_RUNNER_DEBUG=1` — logs Helm stdout/stderr for install commands.
+  - `K8S_RUNNER_PRESERVE=1` — keep the namespace/release after the run.
+  - `K8S_RUNNER_NODE_HOST=<ip|hostname>` — override NodePort host resolution for non-local clusters.
 
 **Specify namespace (if not using default):**
 ```bash
