@@ -15,7 +15,10 @@ use nomos_libp2p::PeerId;
 use nomos_node::Config as ValidatorConfig;
 use serde::{Serialize, de::DeserializeOwned};
 use subnetworks_assignations::{MembershipCreator, MembershipHandler, SubnetworkId};
-use testing_framework_core::constants::cfgsync_port as default_cfgsync_port;
+use testing_framework_core::{
+    constants::cfgsync_port as default_cfgsync_port,
+    nodes::common::config::injection::normalize_ed25519_sigs,
+};
 
 fn parse_ip(ip_str: &str) -> Ipv4Addr {
     ip_str.parse().unwrap_or_else(|_| {
@@ -72,7 +75,10 @@ where
         apply_membership(&mut config, assignations);
     }
 
-    let yaml = serde_yaml::to_string(&config)
+    let mut yaml_value = serde_yaml::to_value(&config)
+        .map_err(|err| format!("Failed to serialize config to YAML value: {err}"))?;
+    normalize_ed25519_sigs(&mut yaml_value);
+    let yaml = serde_yaml::to_string(&yaml_value)
         .map_err(|err| format!("Failed to serialize config to YAML: {err}"))?;
 
     fs::write(config_file, yaml).map_err(|err| format!("Failed to write config to file: {err}"))?;

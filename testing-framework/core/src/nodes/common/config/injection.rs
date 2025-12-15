@@ -37,7 +37,6 @@ pub fn inject_ibd_into_cryptarchia(yaml_value: &mut Value) {
     ensure_network_adapter(cryptarchia);
     ensure_sync_defaults(cryptarchia);
     ensure_ibd_bootstrap(cryptarchia);
-    normalize_ed25519_sigs(yaml_value);
 }
 
 fn cryptarchia_section(yaml_value: &mut Value) -> Option<&mut Mapping> {
