@@ -107,17 +107,22 @@ impl ConsensusLiveness {
                 match Self::fetch_cluster_info(client).await {
                     Ok((height, tip)) => {
                         let label = format!("node-{idx}");
+
                         tracing::debug!(node = %label, height, tip = ?tip, attempt, "consensus_info collected");
                         samples.push(NodeSample { label, height, tip });
+
                         break;
                     }
+
                     Err(err) if attempt + 1 == REQUEST_RETRIES => {
                         tracing::warn!(node = %format!("node-{idx}"), %err, "consensus_info failed after retries");
+
                         issues.push(ConsensusLivenessIssue::RequestFailed {
                             node: format!("node-{idx}"),
                             source: err,
                         });
                     }
+
                     Err(_) => sleep(REQUEST_RETRY_DELAY).await,
                 }
             }
@@ -186,11 +191,14 @@ impl ConsensusLiveness {
         }
 
         if check.issues.is_empty() {
+            let observed_heights: Vec<_> = check.samples.iter().map(|s| s.height).collect();
+            let observed_tips: Vec<_> = check.samples.iter().map(|s| s.tip).collect();
+
             tracing::info!(
                 target,
                 samples = check.samples.len(),
-                heights = ?check.samples.iter().map(|s| s.height).collect::<Vec<_>>(),
-                tips = ?check.samples.iter().map(|s| s.tip).collect::<Vec<_>>(),
+                heights = ?observed_heights,
+                tips = ?observed_tips,
                 "consensus liveness expectation satisfied"
             );
             Ok(())
@@ -198,6 +206,7 @@ impl ConsensusLiveness {
             for issue in &check.issues {
                 tracing::warn!(?issue, "consensus liveness issue");
             }
+
             Err(Box::new(ConsensusLivenessError::Violations {
                 target,
                 details: check.issues.into(),

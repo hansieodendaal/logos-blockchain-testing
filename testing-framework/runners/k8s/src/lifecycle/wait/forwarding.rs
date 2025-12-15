@@ -5,6 +5,8 @@ use std::{
     time::Duration,
 };
 
+use anyhow::{Result as AnyhowResult, anyhow};
+
 use super::{ClusterWaitError, NodeConfigPorts, NodePortAllocation};
 
 pub fn port_forward_group(
@@ -73,7 +75,7 @@ pub fn port_forward_service(
             return Err(ClusterWaitError::PortForward {
                 service: service.to_owned(),
                 port: remote_port,
-                source: anyhow::anyhow!("kubectl exited with {status}"),
+                source: anyhow!("kubectl exited with {status}"),
             });
         }
         if TcpStream::connect((Ipv4Addr::LOCALHOST, local_port)).is_ok() {
@@ -86,7 +88,7 @@ pub fn port_forward_service(
     Err(ClusterWaitError::PortForward {
         service: service.to_owned(),
         port: remote_port,
-        source: anyhow::anyhow!("port-forward did not become ready"),
+        source: anyhow!("port-forward did not become ready"),
     })
 }
 
@@ -98,7 +100,7 @@ pub fn kill_port_forwards(handles: &mut Vec<Child>) {
     handles.clear();
 }
 
-fn allocate_local_port() -> anyhow::Result<u16> {
+fn allocate_local_port() -> AnyhowResult<u16> {
     let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))?;
     let port = listener.local_addr()?.port();
     drop(listener);

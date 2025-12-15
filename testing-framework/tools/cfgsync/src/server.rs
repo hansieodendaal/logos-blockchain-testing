@@ -1,5 +1,18 @@
 use std::{fs, net::Ipv4Addr, num::NonZero, path::PathBuf, sync::Arc, time::Duration};
 
+// DA Policy Constants
+const DEFAULT_MAX_DISPERSAL_FAILURES: usize = 3;
+const DEFAULT_MAX_SAMPLING_FAILURES: usize = 3;
+const DEFAULT_MAX_REPLICATION_FAILURES: usize = 3;
+const DEFAULT_MALICIOUS_THRESHOLD: usize = 10;
+
+// DA Network Constants
+const DEFAULT_SUBNETS_REFRESH_INTERVAL_SECS: u64 = 30;
+
+// Bootstrap Constants
+const DEFAULT_DELAY_BEFORE_NEW_DOWNLOAD_SECS: u64 = 10;
+const DEFAULT_MAX_ORPHAN_CACHE_SIZE: usize = 5;
+
 use axum::{Json, Router, extract::State, http::StatusCode, response::IntoResponse, routing::post};
 use nomos_da_network_core::swarm::{
     DAConnectionMonitorSettings, DAConnectionPolicySettings, ReplicationConfig,
@@ -7,7 +20,7 @@ use nomos_da_network_core::swarm::{
 use nomos_tracing_service::TracingSettings;
 use nomos_utils::bounded_duration::{MinimalBoundedDuration, SECOND};
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_json::{Value, json, to_value};
 use serde_with::serde_as;
 use subnetworks_assignations::MembershipHandler;
 use testing_framework_config::{
@@ -93,10 +106,10 @@ impl CfgSyncConfig {
             policy_settings: DAConnectionPolicySettings {
                 min_dispersal_peers: self.min_dispersal_peers,
                 min_replication_peers: self.min_replication_peers,
-                max_dispersal_failures: 3,
-                max_sampling_failures: 3,
-                max_replication_failures: 3,
-                malicious_threshold: 10,
+                max_dispersal_failures: DEFAULT_MAX_DISPERSAL_FAILURES,
+                max_sampling_failures: DEFAULT_MAX_SAMPLING_FAILURES,
+                max_replication_failures: DEFAULT_MAX_REPLICATION_FAILURES,
+                malicious_threshold: DEFAULT_MALICIOUS_THRESHOLD,
             },
             monitor_settings: DAConnectionMonitorSettings {
                 failure_time_window: self.monitor_failure_time_window,
@@ -105,7 +118,7 @@ impl CfgSyncConfig {
             balancer_interval: self.balancer_interval,
             redial_cooldown: Duration::ZERO,
             replication_settings: self.replication_settings,
-            subnets_refresh_interval: Duration::from_secs(30),
+            subnets_refresh_interval: Duration::from_secs(DEFAULT_SUBNETS_REFRESH_INTERVAL_SECS),
             retry_shares_limit: self.retry_shares_limit,
             retry_commitments_limit: self.retry_commitments_limit,
         }
@@ -167,12 +180,13 @@ async fn validator_config(
         |config_response| match config_response {
             RepoResponse::Config(config) => {
                 let config = create_validator_config(*config);
-                let mut value =
-                    serde_json::to_value(&config).expect("validator config should serialize");
+                let mut value = to_value(&config).expect("validator config should serialize");
+
                 inject_defaults(&mut value);
                 override_api_ports(&mut value, &ports);
                 inject_da_assignations(&mut value, &config.da_network.membership);
                 override_min_session_members(&mut value);
+
                 (StatusCode::OK, Json(value)).into_response()
             }
             RepoResponse::Timeout => (StatusCode::REQUEST_TIMEOUT).into_response(),
@@ -209,12 +223,13 @@ async fn executor_config(
         |config_response| match config_response {
             RepoResponse::Config(config) => {
                 let config = create_executor_config(*config);
-                let mut value =
-                    serde_json::to_value(&config).expect("executor config should serialize");
+                let mut value = to_value(&config).expect("executor config should serialize");
+
                 inject_defaults(&mut value);
                 override_api_ports(&mut value, &ports);
                 inject_da_assignations(&mut value, &config.da_network.membership);
                 override_min_session_members(&mut value);
+
                 (StatusCode::OK, Json(value)).into_response()
             }
             RepoResponse::Timeout => (StatusCode::REQUEST_TIMEOUT).into_response(),
@@ -229,7 +244,7 @@ pub fn cfgsync_app(config_repo: Arc<ConfigRepo>) -> Router {
         .with_state(config_repo)
 }
 
-fn override_api_ports(config: &mut serde_json::Value, ports: &PortOverrides) {
+fn override_api_ports(config: &mut Value, ports: &PortOverrides) {
     if let Some(api_port) = ports.api_port {
         if let Some(address) = config.pointer_mut("/http/backend_settings/address") {
             *address = json!(format!("0.0.0.0:{api_port}"));
@@ -243,54 +258,54 @@ fn override_api_ports(config: &mut serde_json::Value, ports: &PortOverrides) {
     }
 }
 
-fn inject_da_assignations(
-    config: &mut serde_json::Value,
-    membership: &nomos_node::NomosDaMembership,
-) {
-    let assignations: std::collections::HashMap<String, Vec<String>> = membership
-        .subnetworks()
+fn inject_da_assignations(config: &mut Value, membership: &nomos_node::NomosDaMembership) {
+    fn convert_subnet_to_assignment(
+        subnet_id: impl ToString,
+        members: impl IntoIterator<Item = impl ToString>,
+    ) -> (String, Vec<String>) {
+        let peer_strings: Vec<String> = members.into_iter().map(|peer| peer.to_string()).collect();
+
+        (subnet_id.to_string(), peer_strings)
+    }
+
+    let subnetworks = membership.subnetworks();
+    let assignations: std::collections::HashMap<String, Vec<String>> = subnetworks
         .into_iter()
-        .map(|(subnet_id, members)| {
-            (
-                subnet_id.to_string(),
-                members.into_iter().map(|peer| peer.to_string()).collect(),
-            )
-        })
+        .map(|(subnet_id, members)| convert_subnet_to_assignment(subnet_id, members))
         .collect();
 
     if let Some(membership) = config.pointer_mut("/da_network/membership") {
         if let Some(map) = membership.as_object_mut() {
-            map.insert("assignations".to_string(), serde_json::json!(assignations));
+            map.insert("assignations".to_string(), json!(assignations));
         }
     }
 }
 
-fn override_min_session_members(config: &mut serde_json::Value) {
+fn override_min_session_members(config: &mut Value) {
     if let Some(value) = config.pointer_mut("/da_network/min_session_members") {
-        *value = serde_json::json!(1);
+        *value = json!(1);
     }
 }
 
-fn inject_defaults(config: &mut serde_json::Value) {
+fn inject_defaults(config: &mut Value) {
     if let Some(cryptarchia) = config
         .get_mut("cryptarchia")
         .and_then(|v| v.as_object_mut())
     {
-        let bootstrap = cryptarchia
-            .entry("bootstrap")
-            .or_insert_with(|| serde_json::json!({}));
+        let bootstrap = cryptarchia.entry("bootstrap").or_insert_with(|| json!({}));
         if let Some(bootstrap_map) = bootstrap.as_object_mut() {
-            bootstrap_map
-                .entry("ibd")
-                .or_insert_with(|| serde_json::json!({ "peers": [], "delay_before_new_download": { "secs": 10, "nanos": 0 } }));
+            bootstrap_map.entry("ibd").or_insert_with(
+                || json!({ "peers": [], "delay_before_new_download": { "secs": DEFAULT_DELAY_BEFORE_NEW_DOWNLOAD_SECS, "nanos": 0 } }),
+            );
         }
 
         cryptarchia
             .entry("network_adapter_settings")
-            .or_insert_with(|| serde_json::json!({ "topic": "/cryptarchia/proto" }));
+            .or_insert_with(|| json!({ "topic": "/cryptarchia/proto" }));
+
         cryptarchia.entry("sync").or_insert_with(|| {
-            serde_json::json!({
-                "orphan": { "max_orphan_cache_size": 5 }
+            json!({
+                "orphan": { "max_orphan_cache_size": DEFAULT_MAX_ORPHAN_CACHE_SIZE }
             })
         });
     }

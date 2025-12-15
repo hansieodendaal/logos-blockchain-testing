@@ -35,6 +35,7 @@ impl PortManager {
                 environment
                     .fail("failed to determine container host ports")
                     .await;
+
                 tracing::warn!(%err, "failed to resolve host ports");
                 Err(err)
             }

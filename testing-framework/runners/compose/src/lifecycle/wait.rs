@@ -6,8 +6,11 @@ use testing_framework_core::{
 };
 use tracing::{debug, info};
 
-const DEFAULT_WAIT: Duration = Duration::from_secs(180);
-const POLL_INTERVAL: Duration = Duration::from_millis(250);
+const DEFAULT_WAIT_TIMEOUT_SECS: u64 = 180;
+const POLL_INTERVAL_MILLIS: u64 = 250;
+
+const DEFAULT_WAIT: Duration = Duration::from_secs(DEFAULT_WAIT_TIMEOUT_SECS);
+const POLL_INTERVAL: Duration = Duration::from_millis(POLL_INTERVAL_MILLIS);
 
 pub async fn wait_for_validators(ports: &[u16]) -> Result<(), HttpReadinessError> {
     wait_for_ports(ports, NodeRole::Validator).await
@@ -20,7 +23,9 @@ pub async fn wait_for_executors(ports: &[u16]) -> Result<(), HttpReadinessError>
 async fn wait_for_ports(ports: &[u16], role: NodeRole) -> Result<(), HttpReadinessError> {
     let host = compose_runner_host();
     let timeout = compose_http_timeout();
+
     info!(role = ?role, ports = ?ports, host, "waiting for compose HTTP readiness");
+
     http_probe::wait_for_http_ports_with_host(
         ports,
         role,
@@ -31,8 +36,10 @@ async fn wait_for_ports(ports: &[u16], role: NodeRole) -> Result<(), HttpReadine
     .await
 }
 
+const DEFAULT_COMPOSE_HOST: &str = "127.0.0.1";
+
 fn compose_runner_host() -> String {
-    let host = env::var("COMPOSE_RUNNER_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
+    let host = env::var("COMPOSE_RUNNER_HOST").unwrap_or_else(|_| DEFAULT_COMPOSE_HOST.to_string());
     debug!(host, "compose runner host resolved");
     host
 }

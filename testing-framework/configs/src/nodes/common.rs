@@ -34,6 +34,19 @@ use nomos_wallet::WalletServiceSettings;
 
 use crate::{timeouts, topology::configs::GeneralConfig};
 
+// Configuration constants
+const CRYPTARCHIA_GOSSIPSUB_PROTOCOL: &str = "/cryptarchia/proto";
+const MEMPOOL_PUBSUB_TOPIC: &str = "mantle";
+const STATE_RECORDING_INTERVAL_SECS: u64 = 60;
+const IBD_DOWNLOAD_DELAY_SECS: u64 = 10;
+const MAX_ORPHAN_CACHE_SIZE: usize = 5;
+const DA_PUBLISH_THRESHOLD: f64 = 0.8;
+const API_RATE_LIMIT_PER_SECOND: u64 = 10000;
+const API_RATE_LIMIT_BURST: u32 = 10000;
+const API_MAX_CONCURRENT_REQUESTS: usize = 1000;
+const BLOB_STORAGE_DIR: &str = "./";
+const KZG_PARAMS_FILENAME: &str = "kzgrs_test_params";
+
 pub(crate) fn cryptarchia_deployment(config: &GeneralConfig) -> CryptarchiaDeploymentSettings {
     CryptarchiaDeploymentSettings {
         epoch_config: config.consensus_config.ledger_config.epoch_config,
@@ -47,7 +60,7 @@ pub(crate) fn cryptarchia_deployment(config: &GeneralConfig) -> CryptarchiaDeplo
                 .clone(),
             min_stake: config.consensus_config.ledger_config.sdp_config.min_stake,
         },
-        gossipsub_protocol: "/cryptarchia/proto".to_owned(),
+        gossipsub_protocol: CRYPTARCHIA_GOSSIPSUB_PROTOCOL.to_owned(),
     }
 }
 
@@ -59,7 +72,7 @@ pub(crate) fn time_deployment(config: &GeneralConfig) -> TimeDeploymentSettings 
 
 pub(crate) fn mempool_deployment() -> MempoolDeploymentSettings {
     MempoolDeploymentSettings {
-        pubsub_topic: "mantle".to_owned(),
+        pubsub_topic: MEMPOOL_PUBSUB_TOPIC.to_owned(),
     }
 }
 
@@ -77,7 +90,7 @@ pub(crate) fn cryptarchia_config(config: &GeneralConfig) -> CryptarchiaConfig {
                 force_bootstrap: false,
                 offline_grace_period: chain_service::OfflineGracePeriodConfig {
                     grace_period: timeouts::grace_period(),
-                    state_recording_interval: Duration::from_secs(60),
+                    state_recording_interval: Duration::from_secs(STATE_RECORDING_INTERVAL_SECS),
                 },
             },
         },
@@ -85,12 +98,12 @@ pub(crate) fn cryptarchia_config(config: &GeneralConfig) -> CryptarchiaConfig {
             bootstrap: ChainBootstrapConfig {
                 ibd: chain_network::IbdConfig {
                     peers: HashSet::new(),
-                    delay_before_new_download: Duration::from_secs(10),
+                    delay_before_new_download: Duration::from_secs(IBD_DOWNLOAD_DELAY_SECS),
                 },
             },
             sync: SyncConfig {
                 orphan: OrphanConfig {
-                    max_orphan_cache_size: NonZeroUsize::new(5)
+                    max_orphan_cache_size: NonZeroUsize::new(MAX_ORPHAN_CACHE_SIZE)
                         .expect("Max orphan cache size must be non-zero"),
                 },
             },
@@ -104,9 +117,11 @@ pub(crate) fn cryptarchia_config(config: &GeneralConfig) -> CryptarchiaConfig {
 
 fn kzg_params_path(raw: &str) -> String {
     let path = PathBuf::from(raw);
+
     if path.is_dir() {
-        return path.join("kzgrs_test_params").to_string_lossy().to_string();
+        return path.join(KZG_PARAMS_FILENAME).to_string_lossy().to_string();
     }
+
     path.to_string_lossy().to_string()
 }
 
@@ -121,10 +136,10 @@ pub(crate) fn da_verifier_config(
         tx_verifier_settings: (),
         network_adapter_settings: (),
         storage_adapter_settings: VerifierStorageAdapterSettings {
-            blob_storage_directory: "./".into(),
+            blob_storage_directory: BLOB_STORAGE_DIR.into(),
         },
         mempool_trigger_settings: MempoolPublishTriggerConfig {
-            publish_threshold: NonNegativeF64::try_from(0.8).unwrap(),
+            publish_threshold: NonNegativeF64::try_from(DA_PUBLISH_THRESHOLD).unwrap(),
             share_duration: timeouts::share_duration(),
             prune_duration: timeouts::prune_duration(),
             prune_interval: timeouts::prune_interval(),
@@ -180,9 +195,9 @@ pub(crate) fn http_config(config: &GeneralConfig) -> ApiServiceSettings<NodeAxum
     ApiServiceSettings {
         backend_settings: NodeAxumBackendSettings {
             address: config.api_config.address,
-            rate_limit_per_second: 10000,
-            rate_limit_burst: 10000,
-            max_concurrent_requests: 1000,
+            rate_limit_per_second: API_RATE_LIMIT_PER_SECOND,
+            rate_limit_burst: API_RATE_LIMIT_BURST,
+            max_concurrent_requests: API_MAX_CONCURRENT_REQUESTS,
             ..Default::default()
         },
     }
@@ -194,9 +209,9 @@ pub(crate) fn testing_http_config(
     ApiServiceSettings {
         backend_settings: NodeAxumBackendSettings {
             address: config.api_config.testing_http_address,
-            rate_limit_per_second: 10000,
-            rate_limit_burst: 10000,
-            max_concurrent_requests: 1000,
+            rate_limit_per_second: API_RATE_LIMIT_PER_SECOND,
+            rate_limit_burst: API_RATE_LIMIT_BURST,
+            max_concurrent_requests: API_MAX_CONCURRENT_REQUESTS,
             ..Default::default()
         },
     }

@@ -77,13 +77,13 @@ impl Expectation for TxInclusionExpectation {
         }
 
         let available = limited_user_count(self.user_limit, wallet_accounts.len());
-        let (planned, _) = submission_plan(self.txs_per_block, ctx, available)?;
-        if planned == 0 {
+        let plan = submission_plan(self.txs_per_block, ctx, available)?;
+        if plan.transaction_count == 0 {
             return Err(TxExpectationError::NoPlannedTransactions.into());
         }
 
         tracing::info!(
-            planned_txs = planned,
+            planned_txs = plan.transaction_count,
             txs_per_block = self.txs_per_block.get(),
             user_limit = self.user_limit.map(|u| u.get()),
             "tx inclusion expectation starting capture"
@@ -91,7 +91,7 @@ impl Expectation for TxInclusionExpectation {
 
         let wallet_pks = wallet_accounts
             .into_iter()
-            .take(planned)
+            .take(plan.transaction_count)
             .map(|account| account.secret_key.to_public_key())
             .collect::<HashSet<ZkPublicKey>>();
 
@@ -136,7 +136,7 @@ impl Expectation for TxInclusionExpectation {
 
         self.capture_state = Some(CaptureState {
             observed,
-            expected: planned as u64,
+            expected: plan.transaction_count as u64,
         });
 
         Ok(())

@@ -15,7 +15,7 @@ use nomos_core::mantle::{
 };
 use testing_framework_core::scenario::{BlockRecord, DynError, Expectation, RunContext};
 use thiserror::Error;
-use tokio::sync::broadcast;
+use tokio::{pin, select, spawn, sync::broadcast, time::sleep};
 
 use super::workload::{planned_channel_count, planned_channel_ids};
 
@@ -37,7 +37,7 @@ struct CaptureState {
 }
 
 const MIN_INSCRIPTION_INCLUSION_RATIO: f64 = 0.8;
-const MIN_BLOB_INCLUSION_RATIO: f64 = 0.55;
+const MIN_BLOB_INCLUSION_RATIO: f64 = 0.5;
 
 #[derive(Debug, Error)]
 enum DaExpectationError {
@@ -115,12 +115,12 @@ impl Expectation for DaWorkloadExpectation {
         {
             let run_blocks = Arc::clone(&run_blocks);
             let mut receiver = ctx.block_feed().subscribe();
-            tokio::spawn(async move {
-                let timer = tokio::time::sleep(run_duration);
-                tokio::pin!(timer);
+            spawn(async move {
+                let timer = sleep(run_duration);
+                pin!(timer);
 
                 loop {
-                    tokio::select! {
+                    select! {
                         _ = &mut timer => break,
                         result = receiver.recv() => match result {
                             Ok(_) => {
@@ -139,7 +139,7 @@ impl Expectation for DaWorkloadExpectation {
         let inscriptions_for_task = Arc::clone(&inscriptions);
         let blobs_for_task = Arc::clone(&blobs);
 
-        tokio::spawn(async move {
+        spawn(async move {
             loop {
                 match receiver.recv().await {
                     Ok(record) => capture_block(

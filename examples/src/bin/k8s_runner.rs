@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{env, error::Error, process, str::FromStr, time::Duration};
 
 use runner_examples::ScenarioBuilderExt as _;
 use testing_framework_core::scenario::{Deployer as _, Runner, ScenarioBuilder};
@@ -11,6 +11,8 @@ const DEFAULT_EXECUTORS: usize = 1;
 const MIXED_TXS_PER_BLOCK: u64 = 5;
 const TOTAL_WALLETS: usize = 1000;
 const TRANSACTION_WALLETS: usize = 500;
+const DA_BLOB_RATE: u64 = 1;
+const MIN_CONSENSUS_HEIGHT: u64 = 5;
 
 #[tokio::main]
 async fn main() {
@@ -32,7 +34,7 @@ async fn main() {
 
     if let Err(err) = run_k8s_case(validators, executors, Duration::from_secs(run_secs)).await {
         warn!("k8s runner demo failed: {err}");
-        std::process::exit(1);
+        process::exit(1);
     }
 }
 
@@ -41,7 +43,7 @@ async fn run_k8s_case(
     validators: usize,
     executors: usize,
     run_duration: Duration,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), Box<dyn Error>> {
     info!(
         validators,
         executors,
@@ -59,7 +61,7 @@ async fn run_k8s_case(
                 .users(TRANSACTION_WALLETS)
         })
         .da_with(|da| {
-            da.blob_rate(1)
+            da.blob_rate(DA_BLOB_RATE)
         })
         .with_run_duration(run_duration)
         .expect_consensus_liveness()
@@ -96,9 +98,9 @@ async fn run_k8s_case(
             .consensus_info()
             .await
             .map_err(|err| format!("validator {idx} consensus_info failed: {err}"))?;
-        if info.height < 5 {
+        if info.height < MIN_CONSENSUS_HEIGHT {
             return Err(format!(
-                "validator {idx} height {} should reach at least 5 blocks",
+                "validator {idx} height {} should reach at least {MIN_CONSENSUS_HEIGHT} blocks",
                 info.height
             )
             .into());
@@ -113,13 +115,9 @@ async fn run_k8s_case(
 
 fn read_env_any<T>(keys: &[&str], default: T) -> T
 where
-    T: std::str::FromStr + Copy,
+    T: FromStr + Copy,
 {
     keys.iter()
-        .find_map(|key| {
-            std::env::var(key)
-                .ok()
-                .and_then(|raw| raw.parse::<T>().ok())
-        })
+        .find_map(|key| env::var(key).ok().and_then(|raw| raw.parse::<T>().ok()))
         .unwrap_or(default)
 }

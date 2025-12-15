@@ -4,15 +4,18 @@ use tokio::time::sleep;
 
 use super::{ClusterWaitError, deployment_timeout};
 
+const DEPLOYMENT_POLL_INTERVAL_SECS: u64 = 2;
+
 pub async fn wait_for_deployment_ready(
     client: &Client,
     namespace: &str,
     name: &str,
 ) -> Result<(), ClusterWaitError> {
     let mut elapsed = std::time::Duration::ZERO;
-    let interval = std::time::Duration::from_secs(2);
+    let interval = std::time::Duration::from_secs(DEPLOYMENT_POLL_INTERVAL_SECS);
 
     let timeout = deployment_timeout();
+
     while elapsed <= timeout {
         match Api::<Deployment>::namespaced(client.clone(), namespace)
             .get(name)
@@ -29,6 +32,7 @@ pub async fn wait_for_deployment_ready(
                     .as_ref()
                     .and_then(|status| status.ready_replicas)
                     .unwrap_or(0);
+
                 if ready >= desired {
                     return Ok(());
                 }

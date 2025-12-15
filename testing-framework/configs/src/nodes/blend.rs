@@ -20,6 +20,19 @@ use crate::{
     topology::configs::blend::GeneralBlendConfig as TopologyBlendConfig,
 };
 
+// Blend service constants
+const BLEND_LAYERS_COUNT: u64 = 1;
+const MINIMUM_NETWORK_SIZE: u64 = 1;
+const ROUND_DURATION_SECS: u64 = 1;
+const ROUNDS_PER_INTERVAL: u64 = 30;
+const ROUNDS_PER_SESSION: u64 = 648_000;
+const ROUNDS_PER_OBSERVATION_WINDOW: u64 = 30;
+const ROUNDS_PER_SESSION_TRANSITION: u64 = 30;
+const EPOCH_TRANSITION_SLOTS: u64 = 2_600;
+const SAFETY_BUFFER_INTERVALS: u64 = 100;
+const MESSAGE_FREQUENCY_PER_ROUND: f64 = 1.0;
+const MAX_RELEASE_DELAY_ROUNDS: u64 = 3;
+
 pub(crate) fn build_blend_service_config(
     config: &TopologyBlendConfig,
 ) -> (
@@ -60,26 +73,35 @@ pub(crate) fn build_blend_service_config(
 
     let deployment_settings = BlendDeploymentSettings {
         common: blend_deployment::CommonSettings {
-            num_blend_layers: NonZeroU64::try_from(1).unwrap(),
-            minimum_network_size: NonZeroU64::try_from(1).unwrap(),
+            num_blend_layers: NonZeroU64::try_from(BLEND_LAYERS_COUNT).unwrap(),
+            minimum_network_size: NonZeroU64::try_from(MINIMUM_NETWORK_SIZE).unwrap(),
             timing: TimingSettings {
-                round_duration: Duration::from_secs(1),
-                rounds_per_interval: NonZeroU64::try_from(30u64).unwrap(),
-                rounds_per_session: NonZeroU64::try_from(648_000u64).unwrap(),
-                rounds_per_observation_window: NonZeroU64::try_from(30u64).unwrap(),
-                rounds_per_session_transition_period: NonZeroU64::try_from(30u64).unwrap(),
-                epoch_transition_period_in_slots: NonZeroU64::try_from(2_600).unwrap(),
+                round_duration: Duration::from_secs(ROUND_DURATION_SECS),
+                rounds_per_interval: NonZeroU64::try_from(ROUNDS_PER_INTERVAL).unwrap(),
+                rounds_per_session: NonZeroU64::try_from(ROUNDS_PER_SESSION).unwrap(),
+                rounds_per_observation_window: NonZeroU64::try_from(ROUNDS_PER_OBSERVATION_WINDOW)
+                    .unwrap(),
+                rounds_per_session_transition_period: NonZeroU64::try_from(
+                    ROUNDS_PER_SESSION_TRANSITION,
+                )
+                .unwrap(),
+                epoch_transition_period_in_slots: NonZeroU64::try_from(EPOCH_TRANSITION_SLOTS)
+                    .unwrap(),
             },
             protocol_name: backend_core.protocol_name.clone(),
         },
         core: blend_deployment::CoreSettings {
             scheduler: SchedulerSettings {
                 cover: CoverTrafficSettings {
-                    intervals_for_safety_buffer: 100,
-                    message_frequency_per_round: NonNegativeF64::try_from(1f64).unwrap(),
+                    intervals_for_safety_buffer: SAFETY_BUFFER_INTERVALS,
+                    message_frequency_per_round: NonNegativeF64::try_from(
+                        MESSAGE_FREQUENCY_PER_ROUND,
+                    )
+                    .unwrap(),
                 },
                 delayer: MessageDelayerSettings {
-                    maximum_release_delay_in_rounds: NonZeroU64::try_from(3u64).unwrap(),
+                    maximum_release_delay_in_rounds: NonZeroU64::try_from(MAX_RELEASE_DELAY_ROUNDS)
+                        .unwrap(),
                 },
             },
             minimum_messages_coefficient: backend_core.minimum_messages_coefficient,

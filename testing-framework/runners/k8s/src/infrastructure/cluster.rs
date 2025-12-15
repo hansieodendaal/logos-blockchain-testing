@@ -47,15 +47,20 @@ impl ClusterEnvironment {
         ports: &ClusterPorts,
         port_forwards: Vec<std::process::Child>,
     ) -> Self {
+        let validator_api_ports = ports.validators.iter().map(|ports| ports.api).collect();
+        let validator_testing_ports = ports.validators.iter().map(|ports| ports.testing).collect();
+        let executor_api_ports = ports.executors.iter().map(|ports| ports.api).collect();
+        let executor_testing_ports = ports.executors.iter().map(|ports| ports.testing).collect();
+
         Self {
             client,
             namespace,
             release,
             cleanup: Some(cleanup),
-            validator_api_ports: ports.validators.iter().map(|ports| ports.api).collect(),
-            validator_testing_ports: ports.validators.iter().map(|ports| ports.testing).collect(),
-            executor_api_ports: ports.executors.iter().map(|ports| ports.api).collect(),
-            executor_testing_ports: ports.executors.iter().map(|ports| ports.testing).collect(),
+            validator_api_ports,
+            validator_testing_ports,
+            executor_api_ports,
+            executor_testing_ports,
             prometheus_port: ports.prometheus,
             port_forwards,
         }

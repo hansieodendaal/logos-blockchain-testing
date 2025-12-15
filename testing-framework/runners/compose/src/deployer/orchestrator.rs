@@ -92,6 +92,7 @@ impl DeploymentOrchestrator {
                 host,
                 environment.grafana_port()
             );
+
             print_profiling_urls(&host, &host_ports);
         }
 

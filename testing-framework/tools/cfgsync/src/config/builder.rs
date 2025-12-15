@@ -71,6 +71,7 @@ pub fn create_node_configs(
         &ports,
         &blend_ports,
     );
+
     let api_configs = build_api_configs(&hosts);
     let mut configured_hosts = HashMap::new();
 
@@ -93,25 +94,23 @@ pub fn create_node_configs(
 
     let providers = create_providers(&hosts, &consensus_configs, &blend_configs, &da_configs);
 
-    // Update genesis TX to contain Blend and DA providers.
     let ledger_tx = consensus_configs[0]
         .genesis_tx
         .mantle_tx()
         .ledger_tx
         .clone();
     let genesis_tx = create_genesis_tx_with_declarations(ledger_tx, providers);
+
     for c in &mut consensus_configs {
         c.genesis_tx = genesis_tx.clone();
     }
 
-    // Set Blend and DA keys in KMS of each node config.
     let kms_configs = create_kms_configs(&blend_configs, &da_configs);
 
     for (i, host) in hosts.into_iter().enumerate() {
         let consensus_config = consensus_configs[i].clone();
         let api_config = api_configs[i].clone();
 
-        // DA Libp2p network config.
         let mut da_config = da_configs[i].clone();
         da_config.listening_address = Multiaddr::from_str(&format!(
             "/ip4/0.0.0.0/udp/{}/quic-v1",
@@ -122,7 +121,6 @@ pub fn create_node_configs(
             da_config.policy_settings.min_dispersal_peers = 0;
         }
 
-        // Libp2p network config.
         let mut network_config = network_configs[i].clone();
         network_config.backend.swarm.host = Ipv4Addr::from_str("0.0.0.0").unwrap();
         network_config.backend.swarm.port = host.network_port;
@@ -135,7 +133,6 @@ pub fn create_node_configs(
             .unwrap(),
         };
 
-        // Blend network config.
         let mut blend_config = blend_configs[i].clone();
         blend_config.backend_core.listening_address =
             Multiaddr::from_str(&format!("/ip4/0.0.0.0/udp/{}/quic-v1", host.blend_port)).unwrap();
@@ -166,9 +163,11 @@ pub fn create_node_configs(
 fn generate_ids(count: usize, ids: Option<Vec<[u8; 32]>>) -> Vec<[u8; 32]> {
     ids.unwrap_or_else(|| {
         let mut generated = vec![[0; 32]; count];
+
         for id in &mut generated {
             thread_rng().fill(id);
         }
+
         generated
     })
 }

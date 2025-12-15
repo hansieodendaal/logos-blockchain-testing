@@ -15,6 +15,15 @@ use testing_framework_core::{
     scenario::{DynError, Expectation, RunContext, RunMetrics, Workload as ScenarioWorkload},
     topology::generation::{GeneratedNodeConfig, GeneratedTopology},
 };
+
+/// Submission timing plan for transaction workload execution
+#[derive(Debug, Clone, Copy)]
+pub(super) struct SubmissionPlan {
+    /// Number of transactions to submit
+    pub transaction_count: usize,
+    /// Time interval between submissions  
+    pub submission_interval: Duration,
+}
 use tokio::time::sleep;
 
 use super::expectation::TxInclusionExpectation;
@@ -52,9 +61,13 @@ impl ScenarioWorkload for Workload {
         _run_metrics: &RunMetrics,
     ) -> Result<(), DynError> {
         tracing::info!("initializing transaction workload");
+
         let wallet_accounts = descriptors.config().wallet().accounts.clone();
         if wallet_accounts.is_empty() {
-            return Err("transaction workload requires seeded accounts".into());
+            return Err(
+                "Transaction workload initialization failed: no seeded wallet accounts configured"
+                    .into(),
+            );
         }
 
         let reference_node = descriptors
@@ -64,21 +77,27 @@ impl ScenarioWorkload for Workload {
             .ok_or("transaction workload requires at least one node in the topology")?;
 
         let utxo_map = wallet_utxo_map(reference_node);
+
+        fn match_account_to_utxo(
+            account: WalletAccount,
+            utxo_map: &HashMap<ZkPublicKey, Utxo>,
+        ) -> Option<WalletInput> {
+            utxo_map
+                .get(&account.public_key())
+                .copied()
+                .map(|utxo| WalletInput { account, utxo })
+        }
+
         let mut accounts = wallet_accounts
             .into_iter()
-            .filter_map(|account| {
-                utxo_map
-                    .get(&account.public_key())
-                    .copied()
-                    .map(|utxo| WalletInput { account, utxo })
-            })
+            .filter_map(|account| match_account_to_utxo(account, &utxo_map))
             .collect::<Vec<_>>();
 
         apply_user_limit(&mut accounts, self.user_limit);
 
         if accounts.is_empty() {
             return Err(
-                "transaction workload could not match any accounts to genesis UTXOs".into(),
+                "Transaction workload initialization failed: could not match any wallet accounts to genesis UTXOs".into(),
             );
         }
 
@@ -149,22 +168,22 @@ struct Submission<'a> {
 impl<'a> Submission<'a> {
     fn new(workload: &Workload, ctx: &'a RunContext) -> Result<Self, DynError> {
         if workload.accounts.is_empty() {
-            return Err("transaction workload has no available accounts".into());
+            return Err("Transaction workload submission failed: no available accounts for transaction creation".into());
         }
 
-        let (planned, interval) =
+        let submission_plan =
             submission_plan(workload.txs_per_block, ctx, workload.accounts.len())?;
 
         let plan = workload
             .accounts
             .iter()
-            .take(planned)
+            .take(submission_plan.transaction_count)
             .cloned()
             .collect::<VecDeque<_>>();
 
         tracing::info!(
-            planned,
-            interval_ms = interval.as_millis(),
+            planned = submission_plan.transaction_count,
+            interval_ms = submission_plan.submission_interval.as_millis(),
             accounts_available = workload.accounts.len(),
             "transaction workload submission plan"
         );
@@ -172,7 +191,7 @@ impl<'a> Submission<'a> {
         Ok(Self {
             plan,
             ctx,
-            interval,
+            interval: submission_plan.submission_interval,
         })
     }
 
@@ -183,6 +202,7 @@ impl<'a> Submission<'a> {
             interval_ms = self.interval.as_millis(),
             "begin transaction submissions"
         );
+
         while let Some(input) = self.plan.pop_front() {
             submit_wallet_transaction(self.ctx, &input).await?;
 
@@ -190,6 +210,7 @@ impl<'a> Submission<'a> {
                 sleep(self.interval).await;
             }
         }
+
         tracing::info!("transaction submissions finished");
 
         Ok(())
@@ -212,22 +233,27 @@ fn build_wallet_transaction(input: &WalletInput) -> Result<SignedMantleTx, DynEr
         .add_ledger_output(Note::new(input.utxo.note.value, input.account.public_key()));
 
     let mantle_tx = builder.build();
+
     let tx_hash = mantle_tx.hash();
 
     let signature = ZkKey::multi_sign(
         std::slice::from_ref(&input.account.secret_key),
         tx_hash.as_ref(),
     )
-    .map_err(|err| format!("transaction workload could not sign transaction: {err}"))?;
+    .map_err(|err| {
+        format!("Transaction workload signing failed: could not sign transaction: {err}")
+    })?;
 
     SignedMantleTx::new(mantle_tx, Vec::new(), signature).map_err(|err| {
-        format!("transaction workload constructed invalid transaction: {err}").into()
+        format!("Transaction workload construction failed: invalid transaction structure: {err}")
+            .into()
     })
 }
 
 fn wallet_utxo_map(node: &GeneratedNodeConfig) -> HashMap<ZkPublicKey, Utxo> {
     let genesis_tx = node.general.consensus_config.genesis_tx.clone();
     let ledger_tx = genesis_tx.mantle_tx().ledger_tx.clone();
+
     let tx_hash = ledger_tx.hash();
 
     ledger_tx
@@ -241,6 +267,7 @@ fn wallet_utxo_map(node: &GeneratedNodeConfig) -> HashMap<ZkPublicKey, Utxo> {
 fn apply_user_limit<T>(items: &mut Vec<T>, user_limit: Option<NonZeroUsize>) {
     if let Some(limit) = user_limit {
         let allowed = limit.get().min(items.len());
+
         items.truncate(allowed);
     }
 }
@@ -253,9 +280,9 @@ pub(super) fn submission_plan(
     txs_per_block: NonZeroU64,
     ctx: &RunContext,
     available_accounts: usize,
-) -> Result<(usize, Duration), DynError> {
+) -> Result<SubmissionPlan, DynError> {
     if available_accounts == 0 {
-        return Err("transaction workload scheduled zero transactions".into());
+        return Err("Transaction workload planning failed: no accounts available for transaction scheduling".into());
     }
 
     let run_secs = ctx.run_duration().as_secs_f64();
@@ -265,16 +292,22 @@ pub(super) fn submission_plan(
         .unwrap_or_else(|| ctx.run_duration())
         .as_secs_f64();
 
-    let expected_blocks = run_secs / block_secs;
-    let requested = (expected_blocks * txs_per_block.get() as f64)
+    let estimated_blocks_in_run = run_secs / block_secs;
+    let target_transaction_count = (estimated_blocks_in_run * txs_per_block.get() as f64)
         .floor()
         .clamp(0.0, u64::MAX as f64) as u64;
 
-    let planned = requested.min(available_accounts as u64) as usize;
-    if planned == 0 {
-        return Err("transaction workload scheduled zero transactions".into());
+    let actual_transactions_to_submit =
+        target_transaction_count.min(available_accounts as u64) as usize;
+
+    if actual_transactions_to_submit == 0 {
+        return Err("Transaction workload planning failed: calculated zero transactions to submit based on run duration and target rate".into());
     }
 
-    let interval = Duration::from_secs_f64(run_secs / planned as f64);
-    Ok((planned, interval))
+    let submission_interval =
+        Duration::from_secs_f64(run_secs / actual_transactions_to_submit as f64);
+    Ok(SubmissionPlan {
+        transaction_count: actual_transactions_to_submit,
+        submission_interval,
+    })
 }

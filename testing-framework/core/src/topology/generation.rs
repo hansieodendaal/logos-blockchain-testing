@@ -124,8 +124,11 @@ impl GeneratedTopology {
 
     pub async fn wait_remote_readiness(
         &self,
+        // Node endpoints
         validator_endpoints: &[Url],
         executor_endpoints: &[Url],
+
+        // Membership endpoints
         validator_membership_endpoints: Option<&[Url]>,
         executor_membership_endpoints: Option<&[Url]>,
     ) -> Result<(), ReadinessError> {
@@ -151,6 +154,7 @@ impl GeneratedTopology {
 
         let labels = self.labels();
         let client = Client::new();
+
         let make_testing_base_url = |port: u16| -> Url {
             Url::parse(&format!("http://127.0.0.1:{port}/"))
                 .expect("failed to construct local testing base url")
@@ -163,6 +167,7 @@ impl GeneratedTopology {
                 &listen_ports,
                 &initial_peer_ports,
             );
+
             let network_check = HttpNetworkReadiness {
                 client: &client,
                 endpoints: &endpoints,
@@ -180,6 +185,7 @@ impl GeneratedTopology {
                 urls.len(),
                 "validator membership endpoints must match topology"
             );
+
             membership_endpoints.extend_from_slice(urls);
         } else {
             membership_endpoints.extend(
@@ -195,6 +201,7 @@ impl GeneratedTopology {
                 urls.len(),
                 "executor membership endpoints must match topology"
             );
+
             membership_endpoints.extend_from_slice(urls);
         } else {
             membership_endpoints.extend(
@@ -282,6 +289,7 @@ pub fn find_expected_peer_counts(
             let Some(peer_idx) = listen_ports.iter().position(|p| p == port) else {
                 continue;
             };
+
             if peer_idx == idx {
                 continue;
             }

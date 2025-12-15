@@ -14,10 +14,16 @@ pub static IS_DEBUG_TRACING: LazyLock<bool> = LazyLock::new(|| {
     env::var("NOMOS_TESTS_TRACING").is_ok_and(|val| val.eq_ignore_ascii_case("true"))
 });
 
+const SLOW_ENV_TIMEOUT_MULTIPLIER: u32 = 2;
+
 /// In slow test environments like Codecov, use 2x timeout.
 #[must_use]
 pub fn adjust_timeout(d: Duration) -> Duration {
-    if *IS_SLOW_TEST_ENV { d.mul(2) } else { d }
+    if *IS_SLOW_TEST_ENV {
+        d.mul(SLOW_ENV_TIMEOUT_MULTIPLIER)
+    } else {
+        d
+    }
 }
 
 #[must_use]

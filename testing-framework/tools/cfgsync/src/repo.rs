@@ -12,6 +12,8 @@ use tokio::{sync::oneshot::Sender, time::timeout};
 
 use crate::{config::builder::create_node_configs, host::Host, server::CfgSyncConfig};
 
+const HOST_POLLING_INTERVAL: Duration = Duration::from_secs(1);
+
 pub enum RepoResponse {
     Config(Box<GeneralConfig>),
     Timeout,
@@ -132,7 +134,7 @@ impl ConfigRepo {
             if self.waiting_hosts.lock().unwrap().len() >= self.n_hosts {
                 break;
             }
-            tokio::time::sleep(Duration::from_secs(1)).await;
+            tokio::time::sleep(HOST_POLLING_INTERVAL).await;
         }
     }
 }

@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{env, error::Error, process, str::FromStr, time::Duration};
 
 use runner_examples::{ChaosBuilderExt as _, ScenarioBuilderExt as _};
 use testing_framework_core::scenario::{Deployer as _, Runner, ScenarioBuilder};
@@ -12,15 +12,24 @@ const MIXED_TXS_PER_BLOCK: u64 = 5;
 const TOTAL_WALLETS: usize = 1000;
 const TRANSACTION_WALLETS: usize = 500;
 
+// Chaos Testing Constants
+const CHAOS_MIN_DELAY_SECS: u64 = 120;
+const CHAOS_MAX_DELAY_SECS: u64 = 180;
+const CHAOS_COOLDOWN_SECS: u64 = 240;
+
+// DA Testing Constants
+const DA_CHANNEL_RATE: u64 = 1;
+const DA_BLOB_RATE: u64 = 1;
+
 #[tokio::main]
 async fn main() {
     // Compose containers mount KZG params at /kzgrs_test_params; ensure the
     // generated configs point there unless the caller overrides explicitly.
-    if std::env::var("NOMOS_KZGRS_PARAMS_PATH").is_err() {
+    if env::var("NOMOS_KZGRS_PARAMS_PATH").is_err() {
         // Safe: setting a process-wide environment variable before any threads
         // or async tasks are spawned.
         unsafe {
-            std::env::set_var(
+            env::set_var(
                 "NOMOS_KZGRS_PARAMS_PATH",
                 "/kzgrs_test_params/kzgrs_test_params",
             );
@@ -48,7 +57,7 @@ async fn main() {
 
     if let Err(err) = run_compose_case(validators, executors, Duration::from_secs(run_secs)).await {
         warn!("compose runner demo failed: {err}");
-        std::process::exit(1);
+        process::exit(1);
     }
 }
 
@@ -57,7 +66,7 @@ async fn run_compose_case(
     validators: usize,
     executors: usize,
     run_duration: Duration,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), Box<dyn Error>> {
     info!(
         validators,
         executors,
@@ -74,9 +83,9 @@ async fn run_compose_case(
         .chaos_with(|c| {
             c.restart()
                 // Keep chaos restarts outside the test run window to avoid crash loops on restart.
-                .min_delay(Duration::from_secs(120))
-                .max_delay(Duration::from_secs(180))
-                .target_cooldown(Duration::from_secs(240))
+                .min_delay(Duration::from_secs(CHAOS_MIN_DELAY_SECS))
+                .max_delay(Duration::from_secs(CHAOS_MAX_DELAY_SECS))
+                .target_cooldown(Duration::from_secs(CHAOS_COOLDOWN_SECS))
                 .apply()
         })
         .wallets(TOTAL_WALLETS)
@@ -85,8 +94,8 @@ async fn run_compose_case(
                 .users(TRANSACTION_WALLETS)
         })
         .da_with(|da| {
-            da.channel_rate(1)
-                .blob_rate(1)
+            da.channel_rate(DA_CHANNEL_RATE)
+                .blob_rate(DA_BLOB_RATE)
         })
         .with_run_duration(run_duration)
         .expect_consensus_liveness()
@@ -103,6 +112,7 @@ async fn run_compose_case(
         }
         Err(err) => return Err(err.into()),
     };
+    
     if !runner.context().telemetry().is_configured() {
         warn!("compose runner should expose prometheus metrics");
     }
@@ -113,13 +123,9 @@ async fn run_compose_case(
 
 fn read_env_any<T>(keys: &[&str], default: T) -> T
 where
-    T: std::str::FromStr + Copy,
+    T: FromStr + Copy,
 {
     keys.iter()
-        .find_map(|key| {
-            std::env::var(key)
-                .ok()
-                .and_then(|raw| raw.parse::<T>().ok())
-        })
+        .find_map(|key| env::var(key).ok().and_then(|raw| raw.parse::<T>().ok()))
         .unwrap_or(default)
 }

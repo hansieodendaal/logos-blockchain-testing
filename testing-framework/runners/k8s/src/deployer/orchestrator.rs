@@ -140,6 +140,7 @@ impl Deployer for K8sDeployer {
                 return Err(err.into());
             }
         };
+
         let (block_feed, block_feed_guard) = match spawn_block_feed_with(&node_clients).await {
             Ok(pair) => pair,
             Err(err) => {
@@ -160,6 +161,7 @@ impl Deployer for K8sDeployer {
             grafana_url = %format!("http://{}:{}/", node_host, 30030),
             "grafana dashboard available via NodePort"
         );
+
         if std::env::var("TESTNET_PRINT_ENDPOINTS").is_ok() {
             println!(
                 "TESTNET_ENDPOINTS prometheus=http://{}:{}/ grafana=http://{}:{}/",
@@ -168,6 +170,7 @@ impl Deployer for K8sDeployer {
                 node_host,
                 30030
             );
+
             for (idx, client) in node_clients.validator_clients().iter().enumerate() {
                 println!(
                     "TESTNET_PPROF validator_{}={}/debug/pprof/profile?seconds=15&format=proto",
@@ -175,6 +178,7 @@ impl Deployer for K8sDeployer {
                     client.base_url()
                 );
             }
+
             for (idx, client) in node_clients.executor_clients().iter().enumerate() {
                 println!(
                     "TESTNET_PPROF executor_{}={}/debug/pprof/profile?seconds=15&format=proto",
@@ -183,6 +187,7 @@ impl Deployer for K8sDeployer {
                 );
             }
         }
+
         let (cleanup, port_forwards) = cluster
             .take()
             .expect("cluster should still be available")
@@ -192,6 +197,7 @@ impl Deployer for K8sDeployer {
             block_feed_guard,
             port_forwards,
         ));
+
         let context = RunContext::new(
             descriptors,
             None,
@@ -201,12 +207,14 @@ impl Deployer for K8sDeployer {
             block_feed,
             None,
         );
+
         info!(
             validators = validator_count,
             executors = executor_count,
             duration_secs = scenario.duration().as_secs(),
             "k8s deployment ready; handing control to scenario runner"
         );
+
         Ok(Runner::new(context, Some(cleanup_guard)))
     }
 }

@@ -1,6 +1,11 @@
 #![allow(dead_code)]
 
-use std::{fs::File, io, path::Path};
+use std::{
+    env,
+    fs::{self, File},
+    io,
+    path::{Path, PathBuf},
+};
 
 use nomos_tracing::logging::local::FileConfig;
 use serde::Serialize;
@@ -16,9 +21,11 @@ where
     F: FnOnce(FileConfig),
 {
     debug!(prefix, base_dir = %base_dir.display(), "configuring node logging");
-    if let Ok(env_dir) = std::env::var("NOMOS_LOG_DIR") {
-        let log_dir = std::path::PathBuf::from(env_dir);
-        let _ = std::fs::create_dir_all(&log_dir);
+
+    if let Ok(env_dir) = env::var("NOMOS_LOG_DIR") {
+        let log_dir = PathBuf::from(env_dir);
+        let _ = fs::create_dir_all(&log_dir);
+
         set_logger(FileConfig {
             directory: log_dir,
             prefix: Some(prefix.into()),
@@ -39,10 +46,13 @@ where
     F: FnOnce(&mut Value),
 {
     debug!(path = %path.display(), "writing node config with injection");
+
     let mut yaml_value =
         serde_yaml::to_value(config).map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
+
     inject(&mut yaml_value);
     normalize_ed25519_sigs(&mut yaml_value);
+
     let file = File::create(path)?;
     serde_yaml::to_writer(file, &yaml_value)
         .map_err(|err| io::Error::new(io::ErrorKind::Other, err))

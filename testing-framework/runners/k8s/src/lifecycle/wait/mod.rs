@@ -101,14 +101,17 @@ static DEPLOYMENT_TIMEOUT: LazyLock<Duration> = LazyLock::new(|| {
         DEFAULT_K8S_DEPLOYMENT_TIMEOUT,
     )
 });
+
 static NODE_HTTP_TIMEOUT: LazyLock<Duration> =
     LazyLock::new(|| env_duration_secs("K8S_RUNNER_HTTP_TIMEOUT_SECS", DEFAULT_NODE_HTTP_TIMEOUT));
+
 static NODE_HTTP_PROBE_TIMEOUT: LazyLock<Duration> = LazyLock::new(|| {
     env_duration_secs(
         "K8S_RUNNER_HTTP_PROBE_TIMEOUT_SECS",
         DEFAULT_NODE_HTTP_PROBE_TIMEOUT,
     )
 });
+
 static HTTP_POLL_INTERVAL: LazyLock<Duration> = LazyLock::new(|| {
     env_duration_secs(
         "K8S_RUNNER_HTTP_POLL_INTERVAL_SECS",
@@ -133,12 +136,14 @@ pub(crate) fn http_poll_interval() -> Duration {
 }
 
 pub(crate) const PROMETHEUS_HTTP_PORT: u16 = DEFAULT_PROMETHEUS_HTTP_PORT;
+
 static PROMETHEUS_HTTP_TIMEOUT: LazyLock<Duration> = LazyLock::new(|| {
     env_duration_secs(
         "K8S_RUNNER_PROMETHEUS_HTTP_TIMEOUT_SECS",
         DEFAULT_PROMETHEUS_HTTP_TIMEOUT,
     )
 });
+
 static PROMETHEUS_HTTP_PROBE_TIMEOUT: LazyLock<Duration> = LazyLock::new(|| {
     env_duration_secs(
         "K8S_RUNNER_PROMETHEUS_HTTP_PROBE_TIMEOUT_SECS",

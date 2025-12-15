@@ -11,11 +11,13 @@ pub async fn wait_for_node_http_nodeport(
     wait_for_node_http_on_host(ports, role, &host, node_http_probe_timeout()).await
 }
 
+const LOCALHOST: &str = "127.0.0.1";
+
 pub async fn wait_for_node_http_port_forward(
     ports: &[u16],
     role: NodeRole,
 ) -> Result<(), ClusterWaitError> {
-    wait_for_node_http_on_host(ports, role, "127.0.0.1", node_http_timeout()).await
+    wait_for_node_http_on_host(ports, role, LOCALHOST, node_http_timeout()).await
 }
 
 async fn wait_for_node_http_on_host(

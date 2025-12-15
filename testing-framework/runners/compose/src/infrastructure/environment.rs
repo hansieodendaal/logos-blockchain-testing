@@ -408,12 +408,14 @@ pub async fn prepare_environment(
 ) -> Result<StackEnvironment, ComposeRunnerError> {
     let workspace = prepare_workspace_logged()?;
     let cfgsync_port = allocate_cfgsync_port()?;
+
     let grafana_env = env::var("COMPOSE_GRAFANA_PORT")
         .ok()
         .and_then(|raw| raw.parse::<u16>().ok());
     if let Some(port) = grafana_env {
         info!(port, "using grafana port from env");
     }
+
     update_cfgsync_logged(&workspace, descriptors, cfgsync_port)?;
     ensure_compose_image().await?;
 
@@ -439,6 +441,7 @@ pub async fn prepare_environment(
         let mut cfgsync_handle = start_cfgsync_stage(&workspace, cfgsync_port).await?;
 
         drop(prometheus_port);
+
         match bring_up_stack_logged(
             &compose_path,
             &project_name,

@@ -1,4 +1,9 @@
-use std::{ops::Deref, path::PathBuf};
+use std::{
+    net::SocketAddr,
+    ops::Deref,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 use nomos_executor::config::Config;
 use nomos_tracing_service::LoggerLayer;
@@ -78,7 +83,7 @@ impl Executor {
     }
 
     /// Wait for the executor process to exit, with a timeout.
-    pub async fn wait_for_exit(&mut self, timeout: std::time::Duration) -> bool {
+    pub async fn wait_for_exit(&mut self, timeout: Duration) -> bool {
         self.handle.wait_for_exit(timeout).await
     }
 }
@@ -88,7 +93,7 @@ impl NodeConfigCommon for Config {
         self.tracing.logger = logger;
     }
 
-    fn set_paths(&mut self, base: &std::path::Path) {
+    fn set_paths(&mut self, base: &Path) {
         self.storage.db_path = base.join("db");
         base.clone_into(
             &mut self
@@ -98,7 +103,7 @@ impl NodeConfigCommon for Config {
         );
     }
 
-    fn addresses(&self) -> (std::net::SocketAddr, Option<std::net::SocketAddr>) {
+    fn addresses(&self) -> (SocketAddr, Option<SocketAddr>) {
         (
             self.http.backend_settings.address,
             Some(self.testing_http.backend_settings.address),
