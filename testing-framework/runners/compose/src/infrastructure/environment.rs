@@ -10,7 +10,7 @@ use testing_framework_core::{
     adjust_timeout, scenario::CleanupGuard, topology::generation::GeneratedTopology,
 };
 use tokio::{process::Command, time::timeout};
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 use crate::{
@@ -128,8 +128,6 @@ impl StackEnvironment {
 
     /// Dump compose logs and trigger cleanup after a failure.
     pub async fn fail(&mut self, reason: &str) {
-        use tracing::error;
-
         error!(
             reason = reason,
             "compose stack failure; dumping docker logs"
