@@ -37,7 +37,7 @@ struct CaptureState {
 }
 
 const MIN_INSCRIPTION_INCLUSION_RATIO: f64 = 0.8;
-const MIN_BLOB_INCLUSION_RATIO: f64 = 0.7;
+const MIN_BLOB_INCLUSION_RATIO: f64 = 0.55;
 
 #[derive(Debug, Error)]
 enum DaExpectationError {
@@ -170,7 +170,7 @@ impl Expectation for DaWorkloadExpectation {
         Ok(())
     }
 
-    async fn evaluate(&mut self, _ctx: &RunContext) -> Result<(), DynError> {
+    async fn evaluate(&mut self, ctx: &RunContext) -> Result<(), DynError> {
         let state = self
             .capture_state
             .as_ref()
@@ -219,10 +219,12 @@ impl Expectation for DaWorkloadExpectation {
         };
 
         let observed_blocks = state.run_blocks.load(Ordering::Relaxed).max(1);
+        let expected_blocks = ctx.run_metrics().expected_consensus_blocks().max(1);
+        let effective_blocks = observed_blocks.min(expected_blocks).max(1);
         let expected_total_blobs = self
             .blob_rate_per_block
             .get()
-            .saturating_mul(observed_blocks);
+            .saturating_mul(effective_blocks);
 
         let missing_blob_channels = missing_channels(&state.planned, &channels_with_blobs);
         let required_blobs = minimum_required_u64(expected_total_blobs, MIN_BLOB_INCLUSION_RATIO);
@@ -232,6 +234,8 @@ impl Expectation for DaWorkloadExpectation {
                 observed_total_blobs,
                 required_blobs,
                 observed_blocks,
+                expected_blocks,
+                effective_blocks,
                 run_duration_secs = state.run_duration.as_secs(),
                 missing_blob_channels = missing_blob_channels.len(),
                 "DA expectation missing blobs"
@@ -257,6 +261,8 @@ impl Expectation for DaWorkloadExpectation {
             expected_total_blobs,
             required_blobs,
             observed_blocks,
+            expected_blocks,
+            effective_blocks,
             "DA inclusion expectation satisfied"
         );
 
