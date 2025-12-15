@@ -116,26 +116,20 @@ impl Deployer for K8sDeployer {
         ) {
             Ok(clients) => clients,
             Err(err) => {
-                if let Some(env) = cluster.as_mut() {
-                    env.fail("failed to construct node api clients").await;
-                }
+                fail_cluster(&mut cluster, "failed to construct node api clients").await;
                 error!(error = ?err, "failed to build k8s node clients");
                 return Err(err.into());
             }
         };
 
-        let telemetry = match metrics_handle_from_port(
-            cluster
-                .as_ref()
-                .expect("cluster must be available for telemetry")
-                .prometheus_port(),
-        ) {
+        let telemetry = match metrics_handle_from_port(cluster_prometheus_port(&cluster)) {
             Ok(handle) => handle,
             Err(err) => {
-                if let Some(env) = cluster.as_mut() {
-                    env.fail("failed to configure prometheus metrics handle")
-                        .await;
-                }
+                fail_cluster(
+                    &mut cluster,
+                    "failed to configure prometheus metrics handle",
+                )
+                .await;
                 error!(error = ?err, "failed to configure prometheus metrics handle");
                 return Err(err.into());
             }
@@ -144,17 +138,16 @@ impl Deployer for K8sDeployer {
         let (block_feed, block_feed_guard) = match spawn_block_feed_with(&node_clients).await {
             Ok(pair) => pair,
             Err(err) => {
-                if let Some(env) = cluster.as_mut() {
-                    env.fail("failed to initialize block feed").await;
-                }
+                fail_cluster(&mut cluster, "failed to initialize block feed").await;
                 error!(error = ?err, "failed to initialize block feed");
                 return Err(err);
             }
         };
 
         let node_host = crate::host::node_host();
+        let prometheus_port = cluster_prometheus_port(&cluster);
         info!(
-            prometheus_url = %format!("http://{}:{}/", node_host, cluster.as_ref().expect("cluster ready").prometheus_port()),
+            prometheus_url = %format!("http://{}:{}/", node_host, prometheus_port),
             "prometheus endpoint available on host"
         );
         info!(
@@ -165,10 +158,7 @@ impl Deployer for K8sDeployer {
         if std::env::var("TESTNET_PRINT_ENDPOINTS").is_ok() {
             println!(
                 "TESTNET_ENDPOINTS prometheus=http://{}:{}/ grafana=http://{}:{}/",
-                node_host,
-                cluster.as_ref().expect("cluster ready").prometheus_port(),
-                node_host,
-                30030
+                node_host, prometheus_port, node_host, 30030
             );
 
             for (idx, client) in node_clients.validator_clients().iter().enumerate() {
@@ -216,6 +206,19 @@ impl Deployer for K8sDeployer {
         );
 
         Ok(Runner::new(context, Some(cleanup_guard)))
+    }
+}
+
+fn cluster_prometheus_port(cluster: &Option<ClusterEnvironment>) -> u16 {
+    cluster
+        .as_ref()
+        .expect("cluster must be available")
+        .prometheus_port()
+}
+
+async fn fail_cluster(cluster: &mut Option<ClusterEnvironment>, reason: &str) {
+    if let Some(env) = cluster.as_mut() {
+        env.fail(reason).await;
     }
 }
 
