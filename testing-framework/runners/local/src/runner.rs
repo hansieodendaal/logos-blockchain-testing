@@ -104,11 +104,12 @@ impl LocalDeployer {
         let topology = descriptors.clone().spawn_local().await;
 
         let skip_membership = !membership_check;
-        if let Err(source) = wait_for_readiness(&topology, skip_membership).await {
-            debug!(error = ?source, "local readiness failed");
-
-            return Err(LocalDeployerError::ReadinessFailed { source });
-        }
+        wait_for_readiness(&topology, skip_membership)
+            .await
+            .map_err(|source| {
+                debug!(error = ?source, "local readiness failed");
+                LocalDeployerError::ReadinessFailed { source }
+            })?;
 
         info!("local nodes are ready");
         Ok(topology)
@@ -149,17 +150,21 @@ async fn spawn_block_feed_with(
         "selecting validator client for local block feed"
     );
 
-    let block_source_client = node_clients.random_validator().cloned().ok_or_else(|| {
-        LocalDeployerError::WorkloadFailed {
+    let Some(block_source_client) = node_clients.random_validator().cloned() else {
+        return Err(LocalDeployerError::WorkloadFailed {
             source: "block feed requires at least one validator".into(),
-        }
-    })?;
+        });
+    };
 
     info!("starting block feed");
 
     spawn_block_feed(block_source_client)
         .await
-        .map_err(|source| LocalDeployerError::WorkloadFailed {
-            source: source.into(),
-        })
+        .map_err(workload_error)
+}
+
+fn workload_error(source: impl Into<DynError>) -> LocalDeployerError {
+    LocalDeployerError::WorkloadFailed {
+        source: source.into(),
+    }
 }
