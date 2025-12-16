@@ -41,7 +41,7 @@ Both **LocalDeployer** and **ComposeDeployer** work in CI environments:
 - **Trade-off:** Slower startup (Docker image build)
 - **Trade-off:** Requires Docker daemon
 
-See `.github/workflows/compose-mixed.yml` for a complete CI example using ComposeDeployer.
+See `.github/workflows/lint.yml` (jobs: `host_smoke`, `compose_smoke`) for CI examples running the demo scenarios.
 
 ## Running Examples
 
@@ -231,6 +231,15 @@ Note the repeated filename: the directory `kzgrs_test_params/` contains a file n
 NOMOS_KZGRS_PARAMS_PATH=/path/to/custom/params cargo run -p runner-examples --bin local_runner
 ```
 
+### Directory vs File (KZG)
+
+The system uses KZG assets in two distinct ways:
+
+| Concept | Used by | Meaning |
+|--------|---------|---------|
+| **KZG directory** | deployers/scripts | A directory that contains the KZG file (and related artifacts). Defaults to `testing-framework/assets/stack/kzgrs_test_params` and is controlled by `NOMOS_KZG_DIR_REL` (relative to the workspace root). |
+| **KZG file path** | node processes | A single file path passed to nodes via `NOMOS_KZGRS_PARAMS_PATH` (inside containers/pods this is typically `/kzgrs_test_params/kzgrs_test_params`). |
+
 ### Getting Circuit Assets
 
 **Option 1: Use helper script** (recommended):
@@ -245,8 +254,10 @@ cp -r /tmp/nomos-circuits/* testing-framework/assets/stack/kzgrs_test_params/
 
 **Option 2: Build locally** (advanced):
 ```bash
-# Requires Go, Rust, and circuit build tools
-make kzgrs_test_params
+# This repository does not provide a `make kzgrs_test_params` target.
+# If you need to regenerate KZG params from source, follow upstream tooling
+# instructions (unspecified here) or use the helper scripts above to fetch a
+# known-good bundle.
 ```
 
 ### CI Workflow
@@ -439,21 +450,24 @@ cargo run -p runner-examples --bin compose_runner
 kubectl get pods
 
 # Stream logs using label selectors (recommended)
-kubectl logs -l app=nomos-validator -f
-kubectl logs -l app=nomos-executor -f
+# Helm chart labels:
+# - nomos/logical-role=validator|executor
+# - nomos/validator-index / nomos/executor-index
+kubectl logs -l nomos/logical-role=validator -f
+kubectl logs -l nomos/logical-role=executor -f
 
 # Stream logs from specific pod
 kubectl logs -f nomos-validator-0
 
 # Previous logs from crashed pods
-kubectl logs --previous -l app=nomos-validator
+kubectl logs --previous -l nomos/logical-role=validator
 ```
 
 **Download logs for offline analysis:**
 ```bash
 # Using label selectors
-kubectl logs -l app=nomos-validator --tail=1000 > all-validators.log
-kubectl logs -l app=nomos-executor --tail=1000 > all-executors.log
+kubectl logs -l nomos/logical-role=validator --tail=1000 > all-validators.log
+kubectl logs -l nomos/logical-role=executor --tail=1000 > all-executors.log
 
 # Specific pods
 kubectl logs nomos-validator-0 > validator-0.log
@@ -472,7 +486,7 @@ kubectl logs nomos-executor-1 > executor-1.log
 
 **Specify namespace (if not using default):**
 ```bash
-kubectl logs -n my-namespace -l app=nomos-validator -f
+kubectl logs -n my-namespace -l nomos/logical-role=validator -f
 ```
 
 ### OTLP and Telemetry
@@ -495,10 +509,11 @@ Runners expose metrics and node HTTP endpoints for expectation code and debuggin
 **Prometheus (Compose only):**
 - Default: `http://localhost:9090`
 - Override: `TEST_FRAMEWORK_PROMETHEUS_PORT=9091`
-- Access from expectations: `ctx.telemetry().prometheus_endpoint()`
+- Note: the host port can vary if `9090` is unavailable; prefer the printed `TESTNET_ENDPOINTS` line as the source of truth.
+- Access from expectations: `ctx.telemetry().prometheus().map(|p| p.base_url())`
 
 **Node APIs:**
-- Access from expectations: `ctx.node_clients().validators().get(0)`
+- Access from expectations: `ctx.node_clients().validator_clients().get(0)`
 - Endpoints: consensus info, network info, DA membership, etc.
 - See `testing-framework/core/src/nodes/api_client.rs` for available methods
 
