@@ -63,7 +63,6 @@ async fn main() {
     }
 }
 
-#[rustfmt::skip]
 async fn run_compose_case(
     validators: usize,
     executors: usize,
@@ -78,39 +77,30 @@ async fn run_compose_case(
 
     let chaos_min_delay = Duration::from_secs(CHAOS_MIN_DELAY_SECS)
         .max(run_duration + Duration::from_secs(CHAOS_DELAY_HEADROOM_SECS));
-    let chaos_max_delay =
-        Duration::from_secs(CHAOS_MAX_DELAY_SECS).max(chaos_min_delay);
+    let chaos_max_delay = Duration::from_secs(CHAOS_MAX_DELAY_SECS).max(chaos_min_delay);
 
     let mut plan = ScenarioBuilder::topology_with(|t| {
-        t.network_star()
-            .validators(validators)
-            .executors(executors)
+        t.network_star().validators(validators).executors(executors)
     })
-        .enable_node_control()
-        .chaos_with(|c| {
-            c.restart()
-                // Keep chaos restarts outside the test run window to avoid crash loops on restart.
-                .min_delay(chaos_min_delay)
-                .max_delay(chaos_max_delay)
-                .target_cooldown(Duration::from_secs(CHAOS_COOLDOWN_SECS))
-                .apply()
-        })
-        .wallets(TOTAL_WALLETS)
-        .transactions_with(|txs| {
-            txs.rate(MIXED_TXS_PER_BLOCK)
-                .users(TRANSACTION_WALLETS)
-        })
-        .da_with(|da| {
-            da.channel_rate(DA_CHANNEL_RATE)
-                .blob_rate(DA_BLOB_RATE)
-        })
-        .with_run_duration(run_duration)
-        .expect_consensus_liveness()
-        .build();
+    .enable_node_control()
+    .chaos_with(|c| {
+        c.restart()
+            // Keep chaos restarts outside the test run window to avoid crash loops on restart.
+            .min_delay(chaos_min_delay)
+            .max_delay(chaos_max_delay)
+            .target_cooldown(Duration::from_secs(CHAOS_COOLDOWN_SECS))
+            .apply()
+    })
+    .wallets(TOTAL_WALLETS)
+    .transactions_with(|txs| txs.rate(MIXED_TXS_PER_BLOCK).users(TRANSACTION_WALLETS))
+    .da_with(|da| da.channel_rate(DA_CHANNEL_RATE).blob_rate(DA_BLOB_RATE))
+    .with_run_duration(run_duration)
+    .expect_consensus_liveness()
+    .build();
 
     let deployer = ComposeDeployer::new();
     info!("deploying compose stack");
-    
+
     let runner: Runner = match deployer.deploy(&plan).await {
         Ok(runner) => runner,
         Err(ComposeRunnerError::DockerUnavailable) => {
@@ -119,7 +109,7 @@ async fn run_compose_case(
         }
         Err(err) => return Err(anyhow::Error::new(err)).context("deploying compose stack failed"),
     };
-    
+
     if !runner.context().telemetry().is_configured() {
         warn!("compose runner should expose prometheus metrics");
     }

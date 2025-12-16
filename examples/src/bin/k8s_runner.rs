@@ -39,12 +39,7 @@ async fn main() {
     }
 }
 
-#[rustfmt::skip]
-async fn run_k8s_case(
-    validators: usize,
-    executors: usize,
-    run_duration: Duration,
-) -> Result<()> {
+async fn run_k8s_case(validators: usize, executors: usize, run_duration: Duration) -> Result<()> {
     info!(
         validators,
         executors,
@@ -52,25 +47,18 @@ async fn run_k8s_case(
         "building scenario plan"
     );
     let mut plan = ScenarioBuilder::topology_with(|t| {
-        t.network_star()
-            .validators(validators)
-            .executors(executors)
+        t.network_star().validators(validators).executors(executors)
     })
-        .wallets(TOTAL_WALLETS)
-        .transactions_with(|txs| {
-            txs.rate(MIXED_TXS_PER_BLOCK)
-                .users(TRANSACTION_WALLETS)
-        })
-        .da_with(|da| {
-            da.blob_rate(DA_BLOB_RATE)
-        })
-        .with_run_duration(run_duration)
-        .expect_consensus_liveness()
-        .build();
+    .wallets(TOTAL_WALLETS)
+    .transactions_with(|txs| txs.rate(MIXED_TXS_PER_BLOCK).users(TRANSACTION_WALLETS))
+    .da_with(|da| da.blob_rate(DA_BLOB_RATE))
+    .with_run_duration(run_duration)
+    .expect_consensus_liveness()
+    .build();
 
     let deployer = K8sDeployer::new();
     info!("deploying k8s stack");
-    
+
     let runner: Runner = match deployer.deploy(&plan).await {
         Ok(runner) => runner,
         Err(K8sRunnerError::ClientInit { source }) => {
