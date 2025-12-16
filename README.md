@@ -9,7 +9,7 @@ This framework enables you to define, deploy, and execute integration tests for 
 **Key capabilities:**
 - **Declarative scenario model** — Define topology, workloads, and success criteria using a fluent builder API
 - **Multiple deployment backends** — Local processes, Docker Compose, or Kubernetes
-- **Built-in workloads** — Transaction injection, DA (Data Availability) traffic, and chaos engineering
+- **Built-in workloads** — Transaction injection, DA (Data Availability) traffic, and restart-based chaos (requires node control; compose runner supported)
 - **Observability-first** — Integrated Prometheus metrics, structured logging, and OpenTelemetry support
 - **Production-ready** — Used in CI/CD pipelines with reproducible containerized environments
 
@@ -20,7 +20,7 @@ This framework enables you to define, deploy, and execute integration tests for 
 - Rust toolchain (nightly)
 - `versions.env` file at repository root (included)
 - For Docker Compose: Docker daemon
-- For Kubernetes: Cluster access and `kubectl`
+- For Kubernetes: Cluster access, `kubectl`, and `helm`
 
 ### Run Your First Test
 
@@ -123,7 +123,7 @@ Key environment variables for customization:
 
 | Variable | Purpose | Default |
 |----------|---------|---------|
-| `POL_PROOF_DEV_MODE=true` | **Required** — Disable expensive proof generation | (none) |
+| `POL_PROOF_DEV_MODE=true` | **Required** — Disable expensive proof generation (set automatically by `scripts/run-examples.sh`) | (none) |
 | `NOMOS_TESTNET_IMAGE` | Docker image tag for compose/k8s | `logos-blockchain-testing:local` |
 | `NOMOS_DEMO_VALIDATORS` | Number of validator nodes | Varies by example |
 | `NOMOS_DEMO_EXECUTORS` | Number of executor nodes | Varies by example |
