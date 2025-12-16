@@ -56,22 +56,53 @@ RUN mkdir -p /opt/circuits && \
         fi; \
     fi; \
     TARGET_ARCH="$(uname -m)"; \
+    expect_arch() { \
+      case "$1" in \
+        x86_64) echo "x86-64|x86_64" ;; \
+        aarch64|arm64) echo "arm64|aarch64" ;; \
+        *) echo "$1" ;; \
+      esac; \
+    }; \
+    require_linux_execs=0; \
+    check_linux_exec() { \
+      local path="$1"; \
+      if [ ! -f "$path" ]; then \
+        return 0; \
+      fi; \
+      local info; \
+      info="$(file -b "$path" 2>/dev/null || true)"; \
+      case "$info" in \
+        *ELF*) : ;; \
+        *) \
+          echo "Circuits executable is not ELF: ${path} (${info}); forcing circuits download"; \
+          require_linux_execs=1; \
+          return 0; \
+          ;; \
+      esac; \
+      pattern="$(expect_arch "$TARGET_ARCH")"; \
+      if [ -n "$pattern" ] && ! echo "$info" | grep -Eqi "$pattern"; then \
+        echo "Circuits executable arch mismatch: ${path} (${info}); forcing circuits download"; \
+        require_linux_execs=1; \
+      fi; \
+    }; \
+    check_linux_exec /opt/circuits/zksign/witness_generator; \
+    check_linux_exec /opt/circuits/pol/witness_generator; \
     if [ -f "/opt/circuits/prover" ]; then \
-        PROVER_INFO="$(file -b /opt/circuits/prover || true)"; \
-        case "$TARGET_ARCH" in \
-            x86_64) EXPECT_ARCH="x86-64" ;; \
-            aarch64|arm64) EXPECT_ARCH="aarch64" ;; \
-            *) EXPECT_ARCH="$TARGET_ARCH" ;; \
-        esac; \
-        if [ -n "$PROVER_INFO" ] && ! echo "$PROVER_INFO" | grep -qi "$EXPECT_ARCH"; then \
-            echo "Circuits prover architecture ($PROVER_INFO) does not match target ${TARGET_ARCH}; rebuilding rapidsnark binaries"; \
-            chmod +x scripts/build-rapidsnark.sh && \
-            RAPIDSNARK_FORCE_REBUILD=1 \
-                scripts/build-rapidsnark.sh /opt/circuits; \
-        fi; \
+      PROVER_INFO="$(file -b /opt/circuits/prover || true)"; \
+      case "$TARGET_ARCH" in \
+        x86_64) EXPECT_ARCH="x86-64" ;; \
+        aarch64|arm64) EXPECT_ARCH="aarch64" ;; \
+        *) EXPECT_ARCH="$TARGET_ARCH" ;; \
+      esac; \
+      if [ -n "$PROVER_INFO" ] && ! echo "$PROVER_INFO" | grep -qi "$EXPECT_ARCH"; then \
+        echo "Circuits prover architecture ($PROVER_INFO) does not match target ${TARGET_ARCH}; rebuilding rapidsnark binaries"; \
+        chmod +x scripts/build-rapidsnark.sh && \
+        RAPIDSNARK_FORCE_REBUILD=1 \
+            scripts/build-rapidsnark.sh /opt/circuits; \
+      fi; \
     fi; \
-    if [ ! -f "/opt/circuits/pol/verification_key.json" ]; then \
-        echo "Local circuits missing pol artifacts; downloading ${VERSION} bundle and rebuilding"; \
+    if [ "$require_linux_execs" -eq 1 ] || [ ! -f "/opt/circuits/pol/verification_key.json" ]; then \
+        echo "Downloading ${VERSION} circuits bundle for ${CIRCUITS_PLATFORM}"; \
         chmod +x scripts/setup-nomos-circuits.sh && \
         NOMOS_CIRCUITS_PLATFORM="${CIRCUITS_PLATFORM}" \
         NOMOS_CIRCUITS_REBUILD_RAPIDSNARK=1 \
@@ -169,16 +200,7 @@ COPY --from=builder /opt/circuits /opt/circuits
 
 # Provide a stable in-image location for the KZG test parameters so EKS runs do
 # not rely on hostPath volumes.
-RUN set -eu; \
-    mkdir -p /opt/nomos/kzg-params; \
-    if [ -f "/opt/circuits/kzgrs_test_params/kzgrs_test_params" ]; then \
-      cp "/opt/circuits/kzgrs_test_params/kzgrs_test_params" "/opt/nomos/kzg-params/kzgrs_test_params"; \
-    elif [ -f "/opt/circuits/kzgrs_test_params" ]; then \
-      cp "/opt/circuits/kzgrs_test_params" "/opt/nomos/kzg-params/kzgrs_test_params"; \
-    else \
-      echo "ERROR: kzgrs_test_params not found under /opt/circuits; cannot seed /opt/nomos/kzg-params" >&2; \
-      exit 1; \
-    fi
+COPY --from=builder /workspace/testing-framework/assets/stack/kzgrs_test_params/kzgrs_test_params /opt/nomos/kzg-params/kzgrs_test_params
 
 COPY --from=builder /workspace/artifacts/nomos-node /usr/bin/nomos-node
 COPY --from=builder /workspace/artifacts/nomos-executor /usr/bin/nomos-executor
