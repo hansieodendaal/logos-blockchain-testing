@@ -11,6 +11,9 @@ use tracing::{info, warn};
 
 use crate::infrastructure::helm::uninstall_release;
 
+const CLEANUP_TIMEOUT: Duration = Duration::from_secs(120);
+const NAMESPACE_DELETE_TIMEOUT: Duration = Duration::from_secs(10);
+
 /// Tears down Helm release and namespace after a run unless preservation is
 /// set.
 pub struct RunnerCleanup {
@@ -51,11 +54,15 @@ impl RunnerCleanup {
     fn blocking_cleanup_success(&self) -> bool {
         match tokio::runtime::Runtime::new() {
             Ok(rt) => match rt.block_on(async {
-                tokio::time::timeout(Duration::from_secs(120), self.cleanup_async()).await
+                tokio::time::timeout(CLEANUP_TIMEOUT, self.cleanup_async()).await
             }) {
                 Ok(()) => true,
                 Err(err) => {
-                    warn!(error = ?err, "cleanup timed out after 120s; falling back to background thread");
+                    warn!(
+                        error = ?err,
+                        "cleanup timed out after {}s; falling back to background thread",
+                        CLEANUP_TIMEOUT.as_secs()
+                    );
                     false
                 }
             },
@@ -95,7 +102,7 @@ fn run_background_cleanup(cleanup: Box<RunnerCleanup>) {
     match tokio::runtime::Runtime::new() {
         Ok(rt) => {
             if let Err(err) = rt.block_on(async {
-                tokio::time::timeout(Duration::from_secs(120), cleanup.cleanup_async()).await
+                tokio::time::timeout(CLEANUP_TIMEOUT, cleanup.cleanup_async()).await
             }) {
                 warn!("[k8s-runner] background cleanup timed out: {err}");
             }
@@ -125,7 +132,7 @@ async fn delete_namespace(client: &Client, namespace: &str) {
 async fn delete_namespace_via_api(namespaces: &Api<Namespace>, namespace: &str) -> bool {
     info!(namespace, "invoking kubernetes API to delete namespace");
     match tokio::time::timeout(
-        Duration::from_secs(10),
+        NAMESPACE_DELETE_TIMEOUT,
         namespaces.delete(namespace, &DeleteParams::default()),
     )
     .await
