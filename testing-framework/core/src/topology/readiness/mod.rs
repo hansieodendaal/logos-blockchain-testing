@@ -12,6 +12,9 @@ use tokio::time::{sleep, timeout};
 
 use crate::adjust_timeout;
 
+const DEFAULT_POLL_INTERVAL: Duration = Duration::from_millis(200);
+const DEFAULT_TIMEOUT: Duration = Duration::from_secs(60);
+
 #[derive(Debug, Error)]
 pub enum ReadinessError {
     #[error("{message}")]
@@ -29,11 +32,11 @@ pub trait ReadinessCheck<'a> {
     fn timeout_message(&self, data: Self::Data) -> String;
 
     fn poll_interval(&self) -> Duration {
-        Duration::from_millis(200)
+        DEFAULT_POLL_INTERVAL
     }
 
     async fn wait(&'a self) -> Result<(), ReadinessError> {
-        let timeout_duration = adjust_timeout(Duration::from_secs(60));
+        let timeout_duration = adjust_timeout(DEFAULT_TIMEOUT);
         let poll_interval = self.poll_interval();
         let mut data = self.collect().await;
 

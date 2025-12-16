@@ -14,7 +14,7 @@ use crate::{
         common::{
             binary::{BinaryConfig, BinaryResolver},
             lifecycle::{kill::kill_child, monitor::is_running},
-            node::{NodeConfigCommon, NodeHandle, spawn_node},
+            node::{NodeAddresses, NodeConfigCommon, NodeHandle, spawn_node},
         },
     },
 };
@@ -104,7 +104,7 @@ impl NodeConfigCommon for Config {
         );
     }
 
-    fn addresses(&self) -> (std::net::SocketAddr, Option<std::net::SocketAddr>) {
+    fn addresses(&self) -> NodeAddresses {
         (
             self.http.backend_settings.address,
             Some(self.testing_http.backend_settings.address),

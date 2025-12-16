@@ -14,6 +14,9 @@ use crate::scenario::{
 
 type WorkloadOutcome = Result<(), DynError>;
 
+const COOLDOWN_BLOCK_INTERVAL_MULTIPLIER: f64 = 5.0;
+const MIN_NODE_CONTROL_COOLDOWN: Duration = Duration::from_secs(30);
+
 /// Represents a fully prepared environment capable of executing a scenario.
 pub struct Runner {
     context: Arc<RunContext>,
@@ -171,7 +174,7 @@ impl Runner {
             if interval.is_zero() {
                 return None;
             }
-            let mut wait = interval.mul_f64(5.0);
+            let mut wait = interval.mul_f64(COOLDOWN_BLOCK_INTERVAL_MULTIPLIER);
             // Expectations observe blocks via `BlockFeed`, which ultimately
             // follows the chain information returned by `consensus_info`.
             // When the consensus uses a security parameter (finality depth),
@@ -186,12 +189,11 @@ impl Runner {
                 .security_param;
             wait = wait.max(interval.mul_f64(security_param.get() as f64));
             if needs_stabilization {
-                let minimum = Duration::from_secs(30);
-                wait = wait.max(minimum);
+                wait = wait.max(MIN_NODE_CONTROL_COOLDOWN);
             }
             Some(wait)
         } else if needs_stabilization {
-            Some(Duration::from_secs(30))
+            Some(MIN_NODE_CONTROL_COOLDOWN)
         } else {
             None
         }

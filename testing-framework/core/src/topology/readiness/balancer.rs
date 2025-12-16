@@ -3,6 +3,8 @@ use nomos_da_network_core::swarm::BalancerStats;
 use super::ReadinessCheck;
 use crate::topology::deployment::Topology;
 
+const POLL_INTERVAL: std::time::Duration = std::time::Duration::from_secs(1);
+
 pub struct DaBalancerReadiness<'a> {
     pub(crate) topology: &'a Topology,
     pub(crate) labels: &'a [String],
@@ -55,7 +57,7 @@ impl<'a> ReadinessCheck<'a> for DaBalancerReadiness<'a> {
     }
 
     fn poll_interval(&self) -> std::time::Duration {
-        std::time::Duration::from_secs(1)
+        POLL_INTERVAL
     }
 }
 

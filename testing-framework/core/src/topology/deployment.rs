@@ -25,6 +25,8 @@ pub struct Topology {
     pub(crate) executors: Vec<Executor>,
 }
 
+pub type DeployedNodes = (Vec<Validator>, Vec<Executor>);
+
 impl Topology {
     pub async fn spawn(config: TopologyConfig) -> Self {
         let generated = TopologyBuilder::new(config.clone()).build();
@@ -75,7 +77,7 @@ impl Topology {
         config: Vec<GeneralConfig>,
         n_validators: usize,
         n_executors: usize,
-    ) -> (Vec<Validator>, Vec<Executor>) {
+    ) -> DeployedNodes {
         let mut validators = Vec::new();
         for i in 0..n_validators {
             let config = create_validator_config(config[i].clone());

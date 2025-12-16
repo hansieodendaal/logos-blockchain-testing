@@ -19,11 +19,18 @@ use crate::nodes::{
     create_tempdir, persist_tempdir,
 };
 
+const EXIT_POLL_INTERVAL: Duration = Duration::from_millis(100);
+const STARTUP_POLL_INTERVAL: Duration = Duration::from_millis(100);
+const STARTUP_TIMEOUT: Duration = Duration::from_secs(60);
+
+pub type NodeAddresses = (SocketAddr, Option<SocketAddr>);
+pub type PreparedNodeConfig<T> = (TempDir, T, SocketAddr, Option<SocketAddr>);
+
 /// Minimal interface to apply common node setup.
 pub trait NodeConfigCommon {
     fn set_logger(&mut self, logger: LoggerLayer);
     fn set_paths(&mut self, base: &Path);
-    fn addresses(&self) -> (SocketAddr, Option<SocketAddr>);
+    fn addresses(&self) -> NodeAddresses;
 }
 
 /// Shared handle for spawned nodes that exposes common operations.
@@ -71,7 +78,7 @@ impl<T> NodeHandle<T> {
                 if !is_running(&mut self.child) {
                     return;
                 }
-                time::sleep(Duration::from_millis(100)).await;
+                time::sleep(EXIT_POLL_INTERVAL).await;
             }
         })
         .await
@@ -85,7 +92,7 @@ pub fn prepare_node_config<T: NodeConfigCommon>(
     mut config: T,
     log_prefix: &str,
     enable_logging: bool,
-) -> (TempDir, T, SocketAddr, Option<SocketAddr>) {
+) -> PreparedNodeConfig<T> {
     let dir = create_tempdir().expect("tempdir");
 
     debug!(dir = %dir.path().display(), log_prefix, enable_logging, "preparing node config");
@@ -140,12 +147,12 @@ where
     let mut handle = NodeHandle::new(child, dir, config, ApiClient::new(addr, testing_addr));
 
     // Wait for readiness via consensus_info
-    let ready = time::timeout(Duration::from_secs(60), async {
+    let ready = time::timeout(STARTUP_TIMEOUT, async {
         loop {
             if handle.api.consensus_info().await.is_ok() {
                 break;
             }
-            time::sleep(Duration::from_millis(100)).await;
+            time::sleep(STARTUP_POLL_INTERVAL).await;
         }
     })
     .await;
