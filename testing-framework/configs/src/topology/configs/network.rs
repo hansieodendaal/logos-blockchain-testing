@@ -8,6 +8,8 @@ use nomos_utils::net::get_available_udp_port;
 
 use crate::node_address_from_port;
 
+const PEER_RESPONSE_TIMEOUT: Duration = Duration::from_secs(60);
+
 #[derive(Default, Clone)]
 pub enum Libp2pNetworkLayout {
     #[default]
@@ -66,7 +68,7 @@ pub fn create_network_configs(
                 node_key,
                 port,
                 chain_sync_config: cryptarchia_sync::Config {
-                    peer_response_timeout: Duration::from_secs(60),
+                    peer_response_timeout: PEER_RESPONSE_TIMEOUT,
                 },
                 nat_config: nat_settings(port),
                 ..default_swarm_config()

@@ -8,6 +8,9 @@ use time::OffsetDateTime;
 
 const DEFAULT_SLOT_TIME: u64 = 2;
 const CONSENSUS_SLOT_TIME_VAR: &str = "CONSENSUS_SLOT_TIME";
+const DEFAULT_NTP_SERVER: &str = "pool.ntp.org";
+const DEFAULT_NTP_TIMEOUT: Duration = Duration::from_secs(5);
+const DEFAULT_NTP_UPDATE_INTERVAL: Duration = Duration::from_secs(16);
 
 #[derive(Clone, Debug)]
 pub struct GeneralTimeConfig {
@@ -27,9 +30,9 @@ pub fn default_time_config() -> GeneralTimeConfig {
     GeneralTimeConfig {
         slot_duration: Duration::from_secs(slot_duration),
         chain_start_time: OffsetDateTime::now_utc(),
-        ntp_server: String::from("pool.ntp.org"),
-        timeout: Duration::from_secs(5),
+        ntp_server: String::from(DEFAULT_NTP_SERVER),
+        timeout: DEFAULT_NTP_TIMEOUT,
         interface: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
-        update_interval: Duration::from_secs(16),
+        update_interval: DEFAULT_NTP_UPDATE_INTERVAL,
     }
 }
