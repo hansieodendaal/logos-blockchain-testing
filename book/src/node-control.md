@@ -32,14 +32,16 @@ which describes the proposed `block_peer`/`unblock_peer` API (not yet implemente
 Check for control support and use it conditionally:
 
 ```rust
-use testing_framework_core::scenario::{Expectation, RunContext, Workload};
+use async_trait::async_trait;
+use testing_framework_core::scenario::{DynError, RunContext, Workload};
 
 struct RestartWorkload;
 
+#[async_trait]
 impl Workload for RestartWorkload {
-    fn name(&self) -> &'static str { "restart_workload" }
+    fn name(&self) -> &str { "restart_workload" }
 
-    async fn start(&self, ctx: &RunContext) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    async fn start(&self, ctx: &RunContext) -> Result<(), DynError> {
         if let Some(control) = ctx.node_control() {
             // Restart the first validator (index 0) if supported.
             control.restart_validator(0).await?;

@@ -140,11 +140,11 @@ Templates and configs in `testing-framework/runners/compose/assets/`:
 **Prometheus (Compose only):**
 - Exposed at `http://localhost:9090` (configurable)
 - Scrapes all validator and executor metrics
-- Accessible in expectations: `ctx.telemetry().prometheus_endpoint()`
+- Accessible in expectations: `ctx.telemetry().prometheus().map(|p| p.base_url())`
 
 **Node APIs:**
 - HTTP endpoints per node for consensus info, network status, DA membership
-- Accessible in expectations: `ctx.node_clients().validators().get(0)`
+- Accessible in expectations: `ctx.node_clients().validator_clients().get(0)`
 
 **OTLP (optional):**
 - Trace endpoint: `NOMOS_OTLP_ENDPOINT=http://localhost:4317`

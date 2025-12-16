@@ -13,35 +13,30 @@ Key ideas:
 - **start**: drive async activity using the shared `RunContext`.
 
 ```rust
-use std::sync::Arc;
 use async_trait::async_trait;
 use testing_framework_core::scenario::{
-    DynError, Expectation, RunContext, RunMetrics, Workload,
+    DynError, Expectation, RunContext, Workload, runtime::context::RunMetrics,
 };
 use testing_framework_core::topology::generation::GeneratedTopology;
 
 pub struct ReachabilityWorkload {
     target_idx: usize,
-    bundled: Vec<Box<dyn Expectation>>,
 }
 
 impl ReachabilityWorkload {
     pub fn new(target_idx: usize) -> Self {
-        Self {
-            target_idx,
-            bundled: vec![Box::new(ReachabilityExpectation::new(target_idx))],
-        }
+        Self { target_idx }
     }
 }
 
 #[async_trait]
 impl Workload for ReachabilityWorkload {
-    fn name(&self) -> &'static str {
+    fn name(&self) -> &str {
         "reachability_workload"
     }
 
     fn expectations(&self) -> Vec<Box<dyn Expectation>> {
-        self.bundled.clone()
+        vec![Box::new(ReachabilityExpectation::new(self.target_idx))]
     }
 
     fn init(
@@ -57,13 +52,13 @@ impl Workload for ReachabilityWorkload {
 
     async fn start(&self, ctx: &RunContext) -> Result<(), DynError> {
         let client = ctx
-            .clients()
-            .validators()
+            .node_clients()
+            .validator_clients()
             .get(self.target_idx)
             .ok_or("missing target client")?;
 
-        // Pseudo-action: issue a lightweight RPC to prove reachability.
-        client.health_check().await.map_err(|e| e.into())
+        // Lightweight API call to prove reachability.
+        client.consensus_info().await.map(|_| ()).map_err(|e| e.into())
     }
 }
 ```
@@ -96,14 +91,16 @@ impl Expectation for ReachabilityExpectation {
 
     async fn evaluate(&mut self, ctx: &RunContext) -> Result<(), DynError> {
         let client = ctx
-            .clients()
-            .validators()
+            .node_clients()
+            .validator_clients()
             .get(self.target_idx)
             .ok_or("missing target client")?;
 
-        client.health_check().await.map_err(|e| {
-            format!("target became unreachable during run: {e}").into()
-        })
+        client
+            .consensus_info()
+            .await
+            .map(|_| ())
+            .map_err(|e| format!("target became unreachable during run: {e}").into())
     }
 }
 ```
