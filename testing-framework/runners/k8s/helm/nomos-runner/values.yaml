@@ -1,4 +1,4 @@
-image: "logos-blockchain-testing:local"
+image: "logos-blockchain-testing:test"
 imagePullPolicy: IfNotPresent
 
 cfgsync:

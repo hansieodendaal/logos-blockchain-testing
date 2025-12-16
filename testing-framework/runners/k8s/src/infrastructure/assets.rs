@@ -94,7 +94,7 @@ pub fn prepare_assets(topology: &GeneratedTopology) -> Result<RunnerAssets, Asse
     let values_yaml = render_values_yaml(topology)?;
     let values_file = write_temp_file(tempdir.path(), "values.yaml", values_yaml)?;
     let image = env::var("NOMOS_TESTNET_IMAGE")
-        .unwrap_or_else(|_| String::from("logos-blockchain-testing:local"));
+        .unwrap_or_else(|_| String::from("logos-blockchain-testing:test"));
 
     debug!(
         cfgsync = %cfgsync_file.display(),
@@ -241,6 +241,8 @@ fn stack_scripts_root(root: &Path) -> PathBuf {
 
 #[derive(Serialize)]
 struct HelmValues {
+    #[serde(rename = "imagePullPolicy")]
+    image_pull_policy: String,
     cfgsync: CfgsyncValues,
     validators: NodeGroup,
     executors: NodeGroup,
@@ -293,6 +295,8 @@ fn build_values(topology: &GeneratedTopology) -> HelmValues {
         port: cfgsync_port(),
     };
     let pol_mode = pol_proof_mode();
+    let image_pull_policy =
+        env::var("NOMOS_TESTNET_IMAGE_PULL_POLICY").unwrap_or_else(|_| "IfNotPresent".into());
     let grafana = GrafanaValues {
         enabled: true,
         image: "grafana/grafana:10.4.1".into(),
@@ -380,6 +384,7 @@ fn build_values(topology: &GeneratedTopology) -> HelmValues {
         .collect();
 
     HelmValues {
+        image_pull_policy,
         cfgsync,
         validators: NodeGroup {
             count: topology.validators().len(),

@@ -12,7 +12,12 @@ set -euo pipefail
 #
 # Env overrides:
 #   VERSION                       - circuits version (default v0.3.1)
-#   NOMOS_TESTNET_IMAGE           - image tag (default logos-blockchain-testing:local)
+#   NOMOS_TESTNET_IMAGE           - image reference (overridden by --ecr/--local selection)
+#   AWS_REGION                    - ECR region (default ap-southeast-2)
+#   AWS_ACCOUNT_ID                - ECR account id (default 968061875204)
+#   ECR_REPO                      - ECR repository (default logos-blockchain-testing)
+#   TAG                           - ECR tag (default test)
+#   NOMOS_TESTNET_IMAGE_PULL_POLICY - k8s imagePullPolicy (default IfNotPresent; set to Always for --ecr)
 #   NOMOS_CIRCUITS_PLATFORM       - override host platform detection
 #   NOMOS_CIRCUITS_REBUILD_RAPIDSNARK - set to 1 to force rapidsnark rebuild
 #   NOMOS_BINARIES_TAR            - path to prebuilt binaries/circuits tarball (required; default .tmp/nomos-binaries-<mode>-<version>.tar.gz)
@@ -30,11 +35,18 @@ Options:
   -t, --run-seconds N   Duration to run the demo (required)
   -v, --validators N    Number of validators (required)
   -e, --executors N     Number of executors (required)
+  --local               Use a local Docker image tag (default for docker-desktop k8s)
+  --ecr                 Use an ECR image reference (default for non-docker-desktop k8s)
   --no-image-build      Skip rebuilding the compose/k8s image (sets NOMOS_SKIP_IMAGE_BUILD=1)
 
 Environment:
   VERSION                        Circuits version (default v0.3.1)
-  NOMOS_TESTNET_IMAGE            Image tag (default logos-blockchain-testing:local)
+  NOMOS_TESTNET_IMAGE            Image reference (overridden by --local/--ecr selection)
+  AWS_REGION                      ECR region (default ap-southeast-2)
+  AWS_ACCOUNT_ID                  ECR account id (default 968061875204)
+  ECR_REPO                        ECR repository (default logos-blockchain-testing)
+  TAG                             ECR tag (default test)
+  NOMOS_TESTNET_IMAGE_PULL_POLICY K8s imagePullPolicy (default IfNotPresent; set to Always for --ecr)
   NOMOS_CIRCUITS_PLATFORM        Override host platform detection
   NOMOS_CIRCUITS_REBUILD_RAPIDSNARK  Force rapidsnark rebuild
   NOMOS_BINARIES_TAR             Path to prebuilt binaries/circuits tarball (required)
@@ -85,7 +97,8 @@ readonly HOST_KZG_FILE="${HOST_KZG_DIR}/${KZG_FILE}"
 MODE="compose"
 RUN_SECS_RAW=""
 VERSION="${DEFAULT_VERSION}"
-IMAGE="${NOMOS_TESTNET_IMAGE:-logos-blockchain-testing:local}"
+IMAGE_SELECTION_MODE="auto"
+IMAGE=""
 DEMO_VALIDATORS=""
 DEMO_EXECUTORS=""
 while [ "$#" -gt 0 ]; do
@@ -98,6 +111,18 @@ while [ "$#" -gt 0 ]; do
       DEMO_VALIDATORS="${2:-}"; shift 2 ;;
     -e|--executors)
       DEMO_EXECUTORS="${2:-}"; shift 2 ;;
+    --local)
+      if [ "${IMAGE_SELECTION_MODE}" = "ecr" ]; then
+        fail_with_usage "--local and --ecr are mutually exclusive"
+      fi
+      IMAGE_SELECTION_MODE="local"
+      shift ;;
+    --ecr)
+      if [ "${IMAGE_SELECTION_MODE}" = "local" ]; then
+        fail_with_usage "--local and --ecr are mutually exclusive"
+      fi
+      IMAGE_SELECTION_MODE="ecr"
+      shift ;;
     --no-image-build)
       NOMOS_SKIP_IMAGE_BUILD=1
       export NOMOS_SKIP_IMAGE_BUILD
@@ -130,6 +155,43 @@ case "$MODE" in
   k8s) BIN="k8s_runner" ;;
   *) echo "Unknown mode '$MODE' (use compose|host|k8s)" >&2; exit 1 ;;
 esac
+
+select_image() {
+  local selection="${IMAGE_SELECTION_MODE}"
+  local context=""
+
+  if [ "${selection}" = "auto" ]; then
+    if [ "${MODE}" = "k8s" ] && command -v kubectl >/dev/null 2>&1; then
+      context="$(kubectl config current-context 2>/dev/null || true)"
+      if [ "${context}" = "docker-desktop" ]; then
+        selection="local"
+      else
+        selection="ecr"
+      fi
+    else
+      selection="local"
+    fi
+  fi
+
+  if [ "${selection}" = "local" ]; then
+    IMAGE="${NOMOS_TESTNET_IMAGE:-logos-blockchain-testing:local}"
+    export NOMOS_TESTNET_IMAGE_PULL_POLICY="${NOMOS_TESTNET_IMAGE_PULL_POLICY:-IfNotPresent}"
+  elif [ "${selection}" = "ecr" ]; then
+    local aws_region="${AWS_REGION:-ap-southeast-2}"
+    local aws_account_id="${AWS_ACCOUNT_ID:-968061875204}"
+    local ecr_repo="${ECR_REPO:-logos-blockchain-testing}"
+    local tag="${TAG:-test}"
+    IMAGE="${aws_account_id}.dkr.ecr.${aws_region}.amazonaws.com/${ecr_repo}:${tag}"
+    export NOMOS_TESTNET_IMAGE_PULL_POLICY="${NOMOS_TESTNET_IMAGE_PULL_POLICY:-Always}"
+  else
+    fail_with_usage "Unknown image selection mode: ${selection}"
+  fi
+
+  export IMAGE_TAG="${IMAGE}"
+  export NOMOS_TESTNET_IMAGE="${IMAGE}"
+}
+
+select_image
 
 if ! [[ "${RUN_SECS_RAW}" =~ ^[0-9]+$ ]] || [ "${RUN_SECS_RAW}" -le 0 ]; then
   fail_with_usage "run-seconds must be a positive integer (pass -t/--run-seconds)"
