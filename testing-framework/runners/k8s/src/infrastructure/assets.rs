@@ -112,7 +112,7 @@ pub fn prepare_assets(topology: &GeneratedTopology) -> Result<RunnerAssets, Asse
     let values_yaml = render_values_yaml(topology)?;
     let values_file = write_temp_file(tempdir.path(), "values.yaml", values_yaml)?;
     let image = env::var("NOMOS_TESTNET_IMAGE")
-        .unwrap_or_else(|_| String::from("logos-blockchain-testing:test"));
+        .unwrap_or_else(|_| String::from("public.ecr.aws/r4s5t9y4/logos/logos-blockchain:test"));
 
     let kzg_display = kzg_path
         .as_ref()

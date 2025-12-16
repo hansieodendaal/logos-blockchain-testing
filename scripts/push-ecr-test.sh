@@ -3,25 +3,44 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-AWS_REGION="ap-southeast-2"
-AWS_ACCOUNT_ID="968061875204"
-ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
-ECR_REPO="logos-blockchain-testing"
-TAG="test"
+# Publishes the testnet image to ECR Public by default.
+#
+# Env overrides:
+#   TAG            - image tag (default: test)
+#   ECR_IMAGE_REPO - full repo path without tag (default: public.ecr.aws/r4s5t9y4/logos/logos-blockchain)
+#   AWS_REGION     - AWS region for ecr-public login (default: us-east-1)
+#
+# Legacy (private ECR) overrides:
+#   AWS_ACCOUNT_ID - if set, uses private ECR login/push unless ECR_IMAGE_REPO points at public.ecr.aws
 
-LOCAL_IMAGE="${ECR_REPO}:${TAG}"
-REMOTE_IMAGE="${ECR_REGISTRY}/${ECR_REPO}:${TAG}"
+TAG="${TAG:-test}"
+ECR_IMAGE_REPO="${ECR_IMAGE_REPO:-public.ecr.aws/r4s5t9y4/logos/logos-blockchain}"
+AWS_REGION="${AWS_REGION:-us-east-1}"
+
+LOCAL_IMAGE="${LOCAL_IMAGE:-logos-blockchain-testing:${TAG}}"
+REMOTE_IMAGE="${ECR_IMAGE_REPO}:${TAG}"
 
 export DOCKER_DEFAULT_PLATFORM="linux/amd64"
 export CIRCUITS_PLATFORM="${CIRCUITS_PLATFORM:-linux-x86_64}"
-export IMAGE_TAG="${LOCAL_IMAGE}"
+export IMAGE_TAG="${REMOTE_IMAGE}"
 
 "${ROOT_DIR}/testing-framework/assets/stack/scripts/build_test_image.sh"
 
-aws ecr get-login-password --region "${AWS_REGION}" \
-  | docker login --username AWS --password-stdin "${ECR_REGISTRY}"
+if [[ "${ECR_IMAGE_REPO}" == public.ecr.aws/* ]]; then
+  aws ecr-public get-login-password --region "${AWS_REGION}" \
+    | docker login --username AWS --password-stdin "public.ecr.aws"
+else
+  if [ -z "${AWS_ACCOUNT_ID:-}" ]; then
+    echo "ERROR: AWS_ACCOUNT_ID must be set for private ECR pushes (or set ECR_IMAGE_REPO=public.ecr.aws/...)" >&2
+    exit 1
+  fi
+  ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+  aws ecr get-login-password --region "${AWS_REGION}" \
+    | docker login --username AWS --password-stdin "${ECR_REGISTRY}"
+  docker tag "${REMOTE_IMAGE}" "${ECR_REGISTRY}/${REMOTE_IMAGE#*/}"
+  REMOTE_IMAGE="${ECR_REGISTRY}/${REMOTE_IMAGE#*/}"
+fi
 
-docker tag "${LOCAL_IMAGE}" "${REMOTE_IMAGE}"
 docker push "${REMOTE_IMAGE}"
 
 echo "${REMOTE_IMAGE}"

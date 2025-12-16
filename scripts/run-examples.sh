@@ -13,10 +13,12 @@ set -euo pipefail
 # Env overrides:
 #   VERSION                       - circuits version (default v0.3.1)
 #   NOMOS_TESTNET_IMAGE           - image reference (overridden by --ecr/--local selection)
-#   AWS_REGION                    - ECR region (default ap-southeast-2)
-#   AWS_ACCOUNT_ID                - ECR account id (default 968061875204)
-#   ECR_REPO                      - ECR repository (default logos-blockchain-testing)
-#   TAG                           - ECR tag (default test)
+#   ECR_IMAGE                     - full image reference to use for --ecr (overrides ECR_REGISTRY/ECR_REPO/TAG)
+#   ECR_REGISTRY                  - registry hostname for --ecr (default public.ecr.aws/r4s5t9y4)
+#   ECR_REPO                      - repository path for --ecr (default logos/logos-blockchain)
+#   TAG                           - tag for --ecr (default test)
+#   AWS_REGION                    - (legacy) private ECR region; used only if AWS_ACCOUNT_ID is set and ECR_REGISTRY is unset
+#   AWS_ACCOUNT_ID                - (legacy) private ECR account id; used only if ECR_REGISTRY is unset
 #   NOMOS_TESTNET_IMAGE_PULL_POLICY - k8s imagePullPolicy (default IfNotPresent; set to Always for --ecr)
 #   NOMOS_CIRCUITS_PLATFORM       - override host platform detection
 #   NOMOS_CIRCUITS_REBUILD_RAPIDSNARK - set to 1 to force rapidsnark rebuild
@@ -42,10 +44,12 @@ Options:
 Environment:
   VERSION                        Circuits version (default v0.3.1)
   NOMOS_TESTNET_IMAGE            Image reference (overridden by --local/--ecr selection)
-  AWS_REGION                      ECR region (default ap-southeast-2)
-  AWS_ACCOUNT_ID                  ECR account id (default 968061875204)
-  ECR_REPO                        ECR repository (default logos-blockchain-testing)
-  TAG                             ECR tag (default test)
+  ECR_IMAGE                       Full image reference for --ecr (overrides ECR_REGISTRY/ECR_REPO/TAG)
+  ECR_REGISTRY                    Registry hostname for --ecr (default public.ecr.aws/r4s5t9y4)
+  ECR_REPO                        Repository path for --ecr (default logos/logos-blockchain)
+  TAG                             Tag for --ecr (default test)
+  AWS_REGION                      (legacy) Private ECR region (used only if AWS_ACCOUNT_ID is set and ECR_REGISTRY is unset)
+  AWS_ACCOUNT_ID                  (legacy) Private ECR account id (used only if ECR_REGISTRY is unset)
   NOMOS_TESTNET_IMAGE_PULL_POLICY K8s imagePullPolicy (default IfNotPresent; set to Always for --ecr)
   NOMOS_CIRCUITS_PLATFORM        Override host platform detection
   NOMOS_CIRCUITS_REBUILD_RAPIDSNARK  Force rapidsnark rebuild
@@ -177,11 +181,23 @@ select_image() {
     IMAGE="${NOMOS_TESTNET_IMAGE:-logos-blockchain-testing:local}"
     export NOMOS_TESTNET_IMAGE_PULL_POLICY="${NOMOS_TESTNET_IMAGE_PULL_POLICY:-IfNotPresent}"
   elif [ "${selection}" = "ecr" ]; then
-    local aws_region="${AWS_REGION:-ap-southeast-2}"
-    local aws_account_id="${AWS_ACCOUNT_ID:-968061875204}"
-    local ecr_repo="${ECR_REPO:-logos-blockchain-testing}"
     local tag="${TAG:-test}"
-    IMAGE="${aws_account_id}.dkr.ecr.${aws_region}.amazonaws.com/${ecr_repo}:${tag}"
+    if [ -n "${ECR_IMAGE:-}" ]; then
+      IMAGE="${ECR_IMAGE}"
+    elif [ -n "${ECR_REGISTRY:-}" ]; then
+      local registry="${ECR_REGISTRY}"
+      local repo="${ECR_REPO:-logos/logos-blockchain}"
+      IMAGE="${registry}/${repo}:${tag}"
+    elif [ -n "${AWS_ACCOUNT_ID:-}" ]; then
+      local aws_region="${AWS_REGION:-ap-southeast-2}"
+      local aws_account_id="${AWS_ACCOUNT_ID}"
+      local repo="${ECR_REPO:-logos-blockchain-testing}"
+      IMAGE="${aws_account_id}.dkr.ecr.${aws_region}.amazonaws.com/${repo}:${tag}"
+    else
+      local registry="public.ecr.aws/r4s5t9y4"
+      local repo="${ECR_REPO:-logos/logos-blockchain}"
+      IMAGE="${registry}/${repo}:${tag}"
+    fi
     export NOMOS_TESTNET_IMAGE_PULL_POLICY="${NOMOS_TESTNET_IMAGE_PULL_POLICY:-Always}"
   else
     fail_with_usage "Unknown image selection mode: ${selection}"

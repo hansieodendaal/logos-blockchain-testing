@@ -1,4 +1,4 @@
-image: "logos-blockchain-testing:test"
+image: "public.ecr.aws/r4s5t9y4/logos/logos-blockchain:test"
 imagePullPolicy: IfNotPresent
 
 cfgsync:
