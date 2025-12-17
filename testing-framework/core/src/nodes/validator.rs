@@ -26,7 +26,7 @@ fn binary_path() -> PathBuf {
         env_var: "NOMOS_NODE_BIN",
         binary_name: "nomos-node",
         fallback_path: BIN_PATH,
-        shared_bin_subpath: "testing-framework/assets/stack/bin/nomos-node",
+        shared_bin_subpath: "../assets/stack/bin/nomos-node",
     };
     BinaryResolver::resolve_path(&cfg)
 }

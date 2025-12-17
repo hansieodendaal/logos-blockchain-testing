@@ -29,7 +29,7 @@ fn binary_path() -> PathBuf {
         env_var: "NOMOS_EXECUTOR_BIN",
         binary_name: "nomos-executor",
         fallback_path: BIN_PATH,
-        shared_bin_subpath: "testing-framework/assets/stack/bin/nomos-executor",
+        shared_bin_subpath: "../assets/stack/bin/nomos-executor",
     };
     BinaryResolver::resolve_path(&cfg)
 }
