@@ -31,6 +31,8 @@ spec:
           env:
             - name: CFG_SERVER_ADDR
               value: http://{{ include "nomos-runner.fullname" $root }}-cfgsync:{{ $root.Values.cfgsync.port }}
+            - name: NOMOS_TIME_BACKEND
+              value: {{ $root.Values.timeBackend | default "monotonic" | quote }}
             - name: NOMOS_KZGRS_PARAMS_PATH
               value: '{{ if eq $root.Values.kzg.mode "inImage" }}{{ $root.Values.kzg.inImageParamsPath }}{{ else }}{{ $root.Values.kzg.hostPathParamsPath }}{{ end }}'
             {{- range $key, $value := $node.env }}

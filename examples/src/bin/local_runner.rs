@@ -43,7 +43,7 @@ async fn main() {
     );
 
     if let Err(err) = run_local_case(validators, executors, Duration::from_secs(run_secs)).await {
-        warn!("local runner demo failed: {err}");
+        warn!("local runner demo failed: {err:#}");
         process::exit(1);
     }
 }

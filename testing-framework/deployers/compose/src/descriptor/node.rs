@@ -69,9 +69,12 @@ impl NodeDescriptor {
             EnvEntry::new("CFG_HOST_IDENTIFIER", identifier),
         ]);
 
+        // Publish container ports on random host ports to avoid collisions with
+        // local services and allow multiple compose stacks to run concurrently.
+        // The runner discovers the chosen host ports via `docker compose port`.
         let ports = vec![
-            format!("127.0.0.1:{api_port}:{api_port}"),
-            format!("127.0.0.1:{testing_port}:{testing_port}"),
+            format!("127.0.0.1::{api_port}"),
+            format!("127.0.0.1::{testing_port}"),
         ];
 
         Self {

@@ -58,7 +58,7 @@ async fn main() {
     );
 
     if let Err(err) = run_compose_case(validators, executors, Duration::from_secs(run_secs)).await {
-        warn!("compose runner demo failed: {err}");
+        warn!("compose runner demo failed: {err:#}");
         process::exit(1);
     }
 }
@@ -75,26 +75,36 @@ async fn run_compose_case(
         "building scenario plan"
     );
 
-    let (chaos_min_delay, chaos_max_delay, chaos_target_cooldown) = chaos_timings(run_duration);
+    let enable_chaos = env::var("NOMOS_DEMO_CHAOS")
+        .or_else(|_| env::var("COMPOSE_DEMO_CHAOS"))
+        .map(|value| value == "1" || value.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
 
-    let mut plan = ScenarioBuilder::topology_with(|t| {
+    let scenario = ScenarioBuilder::topology_with(|t| {
         t.network_star().validators(validators).executors(executors)
     })
-    .enable_node_control()
-    .chaos_with(|c| {
-        c.restart()
-            // Keep chaos restarts outside the test run window to avoid crash loops on restart.
-            .min_delay(chaos_min_delay)
-            .max_delay(chaos_max_delay)
-            .target_cooldown(chaos_target_cooldown)
-            .apply()
-    })
-    .wallets(TOTAL_WALLETS)
-    .transactions_with(|txs| txs.rate(MIXED_TXS_PER_BLOCK).users(TRANSACTION_WALLETS))
-    .da_with(|da| da.channel_rate(DA_CHANNEL_RATE).blob_rate(DA_BLOB_RATE))
-    .with_run_duration(run_duration)
-    .expect_consensus_liveness()
-    .build();
+    .enable_node_control();
+
+    let scenario = if enable_chaos {
+        let (chaos_min_delay, chaos_max_delay, chaos_target_cooldown) = chaos_timings(run_duration);
+        scenario.chaos_with(|c| {
+            c.restart()
+                .min_delay(chaos_min_delay)
+                .max_delay(chaos_max_delay)
+                .target_cooldown(chaos_target_cooldown)
+                .apply()
+        })
+    } else {
+        scenario
+    };
+
+    let mut plan = scenario
+        .wallets(TOTAL_WALLETS)
+        .transactions_with(|txs| txs.rate(MIXED_TXS_PER_BLOCK).users(TRANSACTION_WALLETS))
+        .da_with(|da| da.channel_rate(DA_CHANNEL_RATE).blob_rate(DA_BLOB_RATE))
+        .with_run_duration(run_duration)
+        .expect_consensus_liveness()
+        .build();
 
     let deployer = ComposeDeployer::new();
     info!("deploying compose stack");

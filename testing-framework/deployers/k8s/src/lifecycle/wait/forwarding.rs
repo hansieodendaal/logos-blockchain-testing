@@ -9,7 +9,7 @@ use anyhow::{Result as AnyhowResult, anyhow};
 
 use super::{ClusterWaitError, NodeConfigPorts, NodePortAllocation};
 
-const PORT_FORWARD_READY_ATTEMPTS: u32 = 20;
+const PORT_FORWARD_READY_ATTEMPTS: u32 = 240;
 const PORT_FORWARD_READY_POLL_INTERVAL: Duration = Duration::from_millis(250);
 
 pub struct PortForwardHandle {
