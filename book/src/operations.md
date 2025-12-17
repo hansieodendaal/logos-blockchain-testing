@@ -229,21 +229,24 @@ cargo run -p runner-examples --bin k8s_runner
 - `NOMOS_TESTNET_IMAGE` — Image tag (required)
 - `POL_PROOF_DEV_MODE=true` — **Required** for all runners
 - `NOMOS_DEMO_VALIDATORS` / `NOMOS_DEMO_EXECUTORS` / `NOMOS_DEMO_RUN_SECS` — Topology overrides
-- `K8S_RUNNER_EXTERNAL_PROMETHEUS_URL` (or `NOMOS_EXTERNAL_PROMETHEUS_URL`) — Reuse an existing Prometheus and skip deploying the in-chart Prometheus; also points node OTLP metrics export and the in-cluster Grafana datasource at that Prometheus
+- `K8S_RUNNER_METRICS_QUERY_URL` (or `NOMOS_METRICS_QUERY_URL`) — PromQL base URL the *runner process* can query (e.g. localhost port-forward or public LB)
+- `K8S_RUNNER_METRICS_QUERY_GRAFANA_URL` (or `NOMOS_METRICS_QUERY_GRAFANA_URL`) — PromQL base URL the *Grafana pod* can query (cluster-reachable); defaults to `K8S_RUNNER_METRICS_QUERY_URL` if unset
+- `K8S_RUNNER_METRICS_OTLP_INGEST_URL` (or `NOMOS_METRICS_OTLP_INGEST_URL`) — Full OTLP HTTP ingest URL used by *nodes* to export metrics (backend-specific path)
 
 **External Prometheus (optional):**
 ```bash
-export K8S_RUNNER_EXTERNAL_PROMETHEUS_URL=http://your-prometheus:9090
+export K8S_RUNNER_METRICS_QUERY_URL=http://your-prometheus:9090
 cargo run -p runner-examples --bin k8s_runner
 ```
 
 Notes:
 - The runner config expects Prometheus to accept OTLP metrics at `/api/v1/otlp/v1/metrics` (the in-chart Prometheus is started with `--web.enable-otlp-receiver` and `--enable-feature=otlp-write-receiver`).
 - Use a URL reachable from inside the cluster (for example a `Service` DNS name like `http://prometheus.monitoring:9090`).
+- If you set `K8S_RUNNER_METRICS_QUERY_URL` to a localhost port-forward (e.g. `http://127.0.0.1:8428`), also set `K8S_RUNNER_METRICS_QUERY_GRAFANA_URL` to a cluster-reachable `Service` DNS name so Grafana can query metrics.
 
 **Via `scripts/run-examples.sh` (optional):**
 ```bash
-scripts/run-examples.sh -t 60 -v 1 -e 1 k8s --external-prometheus http://your-prometheus:9090
+scripts/run-examples.sh -t 60 -v 1 -e 1 k8s --metrics-query-url http://your-prometheus:9090
 ```
 
 **In code (optional):**
@@ -252,7 +255,7 @@ use testing_framework_core::scenario::ScenarioBuilder;
 use testing_framework_workflows::ObservabilityBuilderExt as _;
 
 let plan = ScenarioBuilder::with_node_counts(1, 1)
-    .with_external_prometheus_str("http://your-prometheus:9090")
+    .with_metrics_query_url_str("http://your-prometheus:9090")
     .build();
 ```
 
@@ -407,6 +410,30 @@ Common target prefixes for `NOMOS_LOG_FILTER`:
 ```bash
 NOMOS_LOG_FILTER="cryptarchia=trace,nomos_da_sampling=debug,chain_service=info,chain_network=info,chain_leader=info"
 ```
+
+### Keep Metrics Out of Log Output
+
+If you see “metric-like” fields (for example `counter.*`, `gauge.*`) showing up in node logs, it usually means the metric update is being emitted as a `tracing` event and then formatted by the logging layer.
+
+Preferred approach: emit metrics via a metrics API (OpenTelemetry meter / `metrics` crate), and keep `tracing` for logs/traces only.
+
+If you must emit metrics as `tracing` events, route them to a dedicated target and disable that target for the **log formatting** layer:
+
+```rust
+tracing::info!(
+    target: "nomos_metrics",
+    counter.blend_connection_events_total = 1u64,
+    event = event_name,
+);
+```
+
+Then add a filter directive to keep that target out of logs:
+
+```bash
+NOMOS_LOG_FILTER="nomos_metrics=off,cryptarchia=trace,nomos_da_sampling=debug"
+```
+
+Note: this only works if the node’s subscriber applies the filter to the log/`fmt` layer (not globally), so your OTLP metrics pipeline still receives the event/instrumentation.
 
 ### Accessing Logs Per Runner
 
