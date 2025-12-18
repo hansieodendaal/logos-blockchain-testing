@@ -1,5 +1,6 @@
-use runner_examples::cucumber::{
-    Mode, init_logging_defaults, init_node_log_dir_defaults, init_tracing, run,
+use runner_examples::{
+    cucumber::run,
+    defaults::{Mode, init_logging_defaults, init_node_log_dir_defaults, init_tracing},
 };
 
 #[tokio::main(flavor = "current_thread")]

@@ -1,7 +1,7 @@
 use std::{env, process, time::Duration};
 
 use anyhow::{Context as _, Result};
-use runner_examples::{ScenarioBuilderExt as _, read_env_any};
+use runner_examples::{ScenarioBuilderExt as _, demo, read_env_any};
 use testing_framework_core::scenario::{
     Deployer as _, ObservabilityCapability, Runner, ScenarioBuilder,
 };
@@ -9,9 +9,6 @@ use testing_framework_runner_k8s::{K8sDeployer, K8sRunnerError};
 use testing_framework_workflows::ObservabilityBuilderExt as _;
 use tracing::{info, warn};
 
-const DEFAULT_RUN_SECS: u64 = 60;
-const DEFAULT_VALIDATORS: usize = 1;
-const DEFAULT_EXECUTORS: usize = 1;
 const MIXED_TXS_PER_BLOCK: u64 = 2;
 const TOTAL_WALLETS: usize = 200;
 const TRANSACTION_WALLETS: usize = 50;
@@ -21,9 +18,9 @@ const DA_BLOB_RATE: u64 = 1;
 async fn main() {
     tracing_subscriber::fmt::init();
 
-    let validators = read_env_any(&["NOMOS_DEMO_VALIDATORS"], DEFAULT_VALIDATORS);
-    let executors = read_env_any(&["NOMOS_DEMO_EXECUTORS"], DEFAULT_EXECUTORS);
-    let run_secs = read_env_any(&["NOMOS_DEMO_RUN_SECS"], DEFAULT_RUN_SECS);
+    let validators = read_env_any(&["NOMOS_DEMO_VALIDATORS"], demo::DEFAULT_VALIDATORS);
+    let executors = read_env_any(&["NOMOS_DEMO_EXECUTORS"], demo::DEFAULT_EXECUTORS);
+    let run_secs = read_env_any(&["NOMOS_DEMO_RUN_SECS"], demo::DEFAULT_RUN_SECS);
     info!(validators, executors, run_secs, "starting k8s runner demo");
 
     if let Err(err) = run_k8s_case(validators, executors, Duration::from_secs(run_secs)).await {

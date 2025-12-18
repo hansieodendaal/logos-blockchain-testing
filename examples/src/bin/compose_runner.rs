@@ -1,19 +1,13 @@
-use std::{
-    env, fs,
-    path::{Path, PathBuf},
-    process,
-    time::Duration,
-};
+use std::{process, time::Duration};
 
 use anyhow::{Context as _, Result};
-use runner_examples::{ChaosBuilderExt as _, ScenarioBuilderExt as _, read_env_any};
+use runner_examples::{
+    ChaosBuilderExt as _, ScenarioBuilderExt as _, defaults::Mode, demo, read_env_any,
+};
 use testing_framework_core::scenario::{Deployer as _, Runner, ScenarioBuilder};
 use testing_framework_runner_compose::{ComposeDeployer, ComposeRunnerError};
 use tracing::{info, warn};
 
-const DEFAULT_VALIDATORS: usize = 1;
-const DEFAULT_EXECUTORS: usize = 1;
-const DEFAULT_RUN_SECS: u64 = 60;
 const MIXED_TXS_PER_BLOCK: u64 = 5;
 const TOTAL_WALLETS: usize = 1000;
 const TRANSACTION_WALLETS: usize = 500;
@@ -30,28 +24,15 @@ const DA_BLOB_RATE: u64 = 1;
 
 #[tokio::main]
 async fn main() {
-    init_node_log_dir_defaults();
-
-    // Compose containers mount KZG params at /kzgrs_test_params; ensure the
-    // generated configs point there unless the caller overrides explicitly.
-    if env::var("NOMOS_KZGRS_PARAMS_PATH").is_err() {
-        // Safe: setting a process-wide environment variable before any threads
-        // or async tasks are spawned.
-        unsafe {
-            env::set_var(
-                "NOMOS_KZGRS_PARAMS_PATH",
-                "/kzgrs_test_params/kzgrs_test_params",
-            );
-        }
-    }
+    runner_examples::defaults::init_node_log_dir_defaults(Mode::Compose);
 
     tracing_subscriber::fmt::init();
 
-    let validators = read_env_any(&["NOMOS_DEMO_VALIDATORS"], DEFAULT_VALIDATORS);
+    let validators = read_env_any(&["NOMOS_DEMO_VALIDATORS"], demo::DEFAULT_VALIDATORS);
 
-    let executors = read_env_any(&["NOMOS_DEMO_EXECUTORS"], DEFAULT_EXECUTORS);
+    let executors = read_env_any(&["NOMOS_DEMO_EXECUTORS"], demo::DEFAULT_EXECUTORS);
 
-    let run_secs = read_env_any(&["NOMOS_DEMO_RUN_SECS"], DEFAULT_RUN_SECS);
+    let run_secs = read_env_any(&["NOMOS_DEMO_RUN_SECS"], demo::DEFAULT_RUN_SECS);
 
     info!(
         validators,
@@ -62,35 +43,6 @@ async fn main() {
         warn!("compose runner demo failed: {err:#}");
         process::exit(1);
     }
-}
-
-fn init_node_log_dir_defaults() {
-    if env::var_os("NOMOS_LOG_DIR").is_some() {
-        return;
-    }
-
-    let repo_root = repo_root();
-    let host_dir = repo_root.join("tmp").join("node-logs");
-    let _ = fs::create_dir_all(&host_dir);
-
-    // In compose mode, node processes run inside containers; configs should
-    // point to the container path, while the compose deployer mounts the host
-    // repo's `tmp/node-logs` there.
-    unsafe {
-        env::set_var("NOMOS_LOG_DIR", "/tmp/node-logs");
-    }
-}
-
-fn repo_root() -> PathBuf {
-    env::var("CARGO_WORKSPACE_DIR")
-        .map(PathBuf::from)
-        .ok()
-        .or_else(|| {
-            Path::new(env!("CARGO_MANIFEST_DIR"))
-                .parent()
-                .map(Path::to_path_buf)
-        })
-        .expect("repo root must be discoverable from CARGO_WORKSPACE_DIR or CARGO_MANIFEST_DIR")
 }
 
 async fn run_compose_case(
