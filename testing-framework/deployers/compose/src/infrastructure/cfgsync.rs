@@ -4,6 +4,7 @@ use nomos_tracing::metrics::otlp::OtlpMetricsConfig;
 use nomos_tracing_service::MetricsLayer;
 use reqwest::Url;
 use testing_framework_core::{
+    kzg::KzgParamsSpec,
     scenario::cfgsync::{apply_topology_overrides, load_cfgsync_template, write_cfgsync_template},
     topology::generation::GeneratedTopology,
 };
@@ -76,6 +77,7 @@ pub fn update_cfgsync_config(
     let mut cfg = load_cfgsync_template(path)?;
     cfg.port = port;
     apply_topology_overrides(&mut cfg, topology, use_kzg_mount);
+    cfg.global_params_path = KzgParamsSpec::for_compose(use_kzg_mount).node_params_path;
     if let Some(endpoint) = metrics_otlp_ingest_url.cloned() {
         cfg.tracing_settings.metrics = MetricsLayer::Otlp(OtlpMetricsConfig {
             endpoint,

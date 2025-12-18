@@ -1,4 +1,5 @@
 pub mod constants;
+pub mod kzg;
 pub mod nodes;
 pub mod scenario;
 pub mod topology;

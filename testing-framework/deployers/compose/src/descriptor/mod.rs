@@ -5,7 +5,8 @@ use std::{
 
 use serde::Serialize;
 use testing_framework_core::{
-    constants::{DEFAULT_CFGSYNC_PORT, kzg_container_path},
+    constants::DEFAULT_CFGSYNC_PORT,
+    kzg::KzgParamsSpec,
     topology::generation::{GeneratedNodeConfig, GeneratedTopology},
 };
 use testing_framework_env as tf_env;
@@ -180,12 +181,12 @@ fn default_extra_hosts() -> Vec<String> {
     host_gateway_entry().into_iter().collect()
 }
 
-fn base_environment(cfgsync_port: u16) -> Vec<EnvEntry> {
+fn base_environment(cfgsync_port: u16, use_kzg_mount: bool) -> Vec<EnvEntry> {
     let pol_mode = tf_env::pol_proof_dev_mode().unwrap_or_else(|| "true".to_string());
     let rust_log = tf_env::rust_log().unwrap_or_else(|| "info".to_string());
     let nomos_log_level = tf_env::nomos_log_level().unwrap_or_else(|| "info".to_string());
     let time_backend = tf_env::nomos_time_backend().unwrap_or_else(|| "monotonic".into());
-    let kzg_path = tf_env::nomos_kzgrs_params_path().unwrap_or_else(kzg_container_path);
+    let kzg_path = KzgParamsSpec::for_compose(use_kzg_mount).node_params_path;
     vec![
         EnvEntry::new("POL_PROOF_DEV_MODE", pol_mode),
         EnvEntry::new("RUST_LOG", rust_log),

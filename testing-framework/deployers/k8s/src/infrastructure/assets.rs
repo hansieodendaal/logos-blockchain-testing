@@ -10,14 +10,16 @@ use nomos_tracing_service::MetricsLayer;
 use reqwest::Url;
 use serde::Serialize;
 use tempfile::TempDir;
+pub use testing_framework_core::kzg::KzgMode;
 use testing_framework_core::{
     constants::cfgsync_port,
+    kzg::KzgParamsSpec,
     scenario::cfgsync::{apply_topology_overrides, load_cfgsync_template, render_cfgsync_yaml},
     topology::generation::GeneratedTopology,
 };
 use testing_framework_env as tf_env;
 use thiserror::Error;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// Paths and image metadata required to deploy the Helm chart.
 pub struct RunnerAssets {
@@ -75,27 +77,6 @@ pub enum AssetsError {
     },
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum KzgMode {
-    HostPath,
-    InImage,
-}
-
-fn kzg_mode() -> KzgMode {
-    match tf_env::nomos_kzg_mode().as_deref() {
-        Some("hostPath") => KzgMode::HostPath,
-        Some("inImage") => KzgMode::InImage,
-        None => KzgMode::InImage,
-        Some(other) => {
-            warn!(
-                value = other,
-                "unknown NOMOS_KZG_MODE; defaulting to inImage"
-            );
-            KzgMode::InImage
-        }
-    }
-}
-
 /// Render cfgsync config, Helm values, and locate scripts/KZG assets for a
 /// topology.
 pub fn prepare_assets(
@@ -109,8 +90,8 @@ pub fn prepare_assets(
     );
 
     let root = workspace_root().map_err(|source| AssetsError::WorkspaceRoot { source })?;
-    let kzg_mode = kzg_mode();
-    let cfgsync_yaml = render_cfgsync_config(&root, topology, kzg_mode, metrics_otlp_ingest_url)?;
+    let kzg_spec = KzgParamsSpec::for_k8s(&root);
+    let cfgsync_yaml = render_cfgsync_config(&root, topology, &kzg_spec, metrics_otlp_ingest_url)?;
 
     let tempdir = tempfile::Builder::new()
         .prefix("nomos-helm-")
@@ -119,8 +100,8 @@ pub fn prepare_assets(
 
     let cfgsync_file = write_temp_file(tempdir.path(), "cfgsync.yaml", cfgsync_yaml)?;
     let scripts = validate_scripts(&root)?;
-    let kzg_path = match kzg_mode {
-        KzgMode::HostPath => Some(validate_kzg_params(&root)?),
+    let kzg_path = match kzg_spec.mode {
+        KzgMode::HostPath => Some(validate_kzg_params(&root, &kzg_spec)?),
         KzgMode::InImage => None,
     };
     let chart_path = helm_chart_path()?;
@@ -137,7 +118,7 @@ pub fn prepare_assets(
         cfgsync = %cfgsync_file.display(),
         values = %values_file.display(),
         image,
-        kzg_mode = ?kzg_mode,
+        kzg_mode = ?kzg_spec.mode,
         kzg = %kzg_display,
         chart = %chart_path.display(),
         "k8s runner assets prepared"
@@ -145,7 +126,7 @@ pub fn prepare_assets(
 
     Ok(RunnerAssets {
         image,
-        kzg_mode,
+        kzg_mode: kzg_spec.mode,
         kzg_path,
         chart_path,
         cfgsync_file,
@@ -159,12 +140,11 @@ pub fn prepare_assets(
 }
 
 const CFGSYNC_K8S_TIMEOUT_SECS: u64 = 300;
-const DEFAULT_IN_IMAGE_KZG_PARAMS_PATH: &str = "/opt/nomos/kzg-params/kzgrs_test_params";
 
 fn render_cfgsync_config(
     root: &Path,
     topology: &GeneratedTopology,
-    kzg_mode: KzgMode,
+    kzg_spec: &KzgParamsSpec,
     metrics_otlp_ingest_url: Option<&Url>,
 ) -> Result<String, AssetsError> {
     let cfgsync_template_path = stack_assets_root(root).join("cfgsync.yaml");
@@ -173,12 +153,8 @@ fn render_cfgsync_config(
     let mut cfg = load_cfgsync_template(&cfgsync_template_path)
         .map_err(|source| AssetsError::Cfgsync { source })?;
 
-    apply_topology_overrides(&mut cfg, topology, kzg_mode == KzgMode::HostPath);
-
-    if kzg_mode == KzgMode::InImage {
-        cfg.global_params_path = tf_env::nomos_kzgrs_params_path()
-            .unwrap_or_else(|| DEFAULT_IN_IMAGE_KZG_PARAMS_PATH.to_string());
-    }
+    apply_topology_overrides(&mut cfg, topology, kzg_spec.mode == KzgMode::HostPath);
+    cfg.global_params_path = kzg_spec.node_params_path.clone();
 
     if let Some(endpoint) = metrics_otlp_ingest_url.cloned() {
         cfg.tracing_settings.metrics = MetricsLayer::Otlp(OtlpMetricsConfig {
@@ -228,10 +204,12 @@ fn validate_scripts(root: &Path) -> Result<ScriptPaths, AssetsError> {
     })
 }
 
-fn validate_kzg_params(root: &Path) -> Result<PathBuf, AssetsError> {
-    let rel = tf_env::nomos_kzg_dir_rel()
-        .unwrap_or_else(|| testing_framework_core::constants::DEFAULT_KZG_HOST_DIR.to_string());
-    let path = root.join(rel);
+fn validate_kzg_params(root: &Path, spec: &KzgParamsSpec) -> Result<PathBuf, AssetsError> {
+    let Some(path) = spec.host_params_dir.clone() else {
+        return Err(AssetsError::MissingKzg {
+            path: root.join(testing_framework_core::constants::DEFAULT_KZG_HOST_DIR),
+        });
+    };
     if path.exists() {
         Ok(path)
     } else {

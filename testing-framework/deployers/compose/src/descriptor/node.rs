@@ -53,7 +53,7 @@ impl NodeDescriptor {
         use_kzg_mount: bool,
         cfgsync_port: u16,
     ) -> Self {
-        let mut environment = base_environment(cfgsync_port);
+        let mut environment = base_environment(cfgsync_port, use_kzg_mount);
         let identifier = kind.instance_name(index);
         let api_port = node.general.api_config.address.port();
         let testing_port = node.general.api_config.testing_http_address.port();
