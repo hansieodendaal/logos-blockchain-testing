@@ -42,10 +42,16 @@ impl ApiClient {
     #[must_use]
     /// Construct from socket addresses.
     pub fn new(base_addr: SocketAddr, testing_addr: Option<SocketAddr>) -> Self {
-        let base_url =
-            Url::parse(&format!("http://{base_addr}")).expect("Valid base address for node");
-        let testing_url = testing_addr
-            .map(|addr| Url::parse(&format!("http://{addr}")).expect("Valid testing address"));
+        let base_url = Url::parse(&format!("http://{base_addr}")).unwrap_or_else(|_| unsafe {
+            // Safety: `SocketAddr` formatting yields a valid host:port pair.
+            std::hint::unreachable_unchecked()
+        });
+        let testing_url = testing_addr.map(|addr| {
+            Url::parse(&format!("http://{addr}")).unwrap_or_else(|_| unsafe {
+                // Safety: `SocketAddr` formatting yields a valid host:port pair.
+                std::hint::unreachable_unchecked()
+            })
+        });
         Self::from_urls(base_url, testing_url)
     }
 
@@ -126,38 +132,51 @@ impl ApiClient {
     }
 
     /// GET and decode JSON from the testing API.
-    pub async fn get_testing_json<T>(&self, path: &str) -> reqwest::Result<T>
+    pub async fn get_testing_json<T>(&self, path: &str) -> Result<T, ApiClientError>
     where
         T: DeserializeOwned,
     {
-        self.get_testing_response(path)
+        self.get_testing_response_checked(path)
             .await?
-            .error_for_status()?
+            .error_for_status()
+            .map_err(ApiClientError::Request)?
             .json()
             .await
+            .map_err(ApiClientError::Request)
     }
 
     /// POST JSON to the testing API and decode a response.
-    pub async fn post_testing_json_decode<T, R>(&self, path: &str, body: &T) -> reqwest::Result<R>
+    pub async fn post_testing_json_decode<T, R>(
+        &self,
+        path: &str,
+        body: &T,
+    ) -> Result<R, ApiClientError>
     where
         T: Serialize + Sync + ?Sized,
         R: DeserializeOwned,
     {
-        self.post_testing_json_response(path, body)
+        self.post_testing_json_response_checked(path, body)
             .await?
-            .error_for_status()?
+            .error_for_status()
+            .map_err(ApiClientError::Request)?
             .json()
             .await
+            .map_err(ApiClientError::Request)
     }
 
     /// POST JSON to the testing API and expect a success status.
-    pub async fn post_testing_json_unit<T>(&self, path: &str, body: &T) -> reqwest::Result<()>
+    pub async fn post_testing_json_unit<T>(
+        &self,
+        path: &str,
+        body: &T,
+    ) -> Result<(), ApiClientError>
     where
         T: Serialize + Sync + ?Sized,
     {
-        self.post_testing_json_response(path, body)
+        self.post_testing_json_response_checked(path, body)
             .await?
-            .error_for_status()?;
+            .error_for_status()
+            .map_err(ApiClientError::Request)?;
         Ok(())
     }
 
@@ -186,17 +205,11 @@ impl ApiClient {
         &self,
         path: &str,
         body: &T,
-    ) -> reqwest::Result<Response>
+    ) -> Result<Response, ApiClientError>
     where
         T: Serialize + Sync + ?Sized,
     {
-        match self.post_testing_json_response_checked(path, body).await {
-            Ok(resp) => Ok(resp),
-            Err(ApiClientError::Request(err)) => Err(err),
-            Err(ApiClientError::TestingEndpointUnavailable) => {
-                panic!("{DA_GET_TESTING_ENDPOINT_ERROR}")
-            }
-        }
+        self.post_testing_json_response_checked(path, body).await
     }
 
     /// GET from the testing API and return the raw response.
@@ -215,14 +228,8 @@ impl ApiClient {
             .map_err(ApiClientError::Request)
     }
 
-    pub async fn get_testing_response(&self, path: &str) -> reqwest::Result<Response> {
-        match self.get_testing_response_checked(path).await {
-            Ok(resp) => Ok(resp),
-            Err(ApiClientError::Request(err)) => Err(err),
-            Err(ApiClientError::TestingEndpointUnavailable) => {
-                panic!("{DA_GET_TESTING_ENDPOINT_ERROR}")
-            }
-        }
+    pub async fn get_testing_response(&self, path: &str) -> Result<Response, ApiClientError> {
+        self.get_testing_response_checked(path).await
     }
 
     /// Block a peer via the DA testing API.
@@ -314,7 +321,7 @@ impl ApiClient {
     pub async fn da_get_membership(
         &self,
         session_id: &SessionNumber,
-    ) -> reqwest::Result<MembershipResponse> {
+    ) -> Result<MembershipResponse, ApiClientError> {
         self.post_testing_json_decode(DA_GET_MEMBERSHIP, session_id)
             .await
     }
@@ -323,7 +330,7 @@ impl ApiClient {
     pub async fn da_historic_sampling(
         &self,
         request: &HistoricSamplingRequest<BlobId>,
-    ) -> reqwest::Result<bool> {
+    ) -> Result<bool, ApiClientError> {
         self.post_testing_json_decode(DA_HISTORIC_SAMPLING, request)
             .await
     }
@@ -371,6 +378,17 @@ impl ApiClient {
 
     fn join_url(base: &Url, path: &str) -> Url {
         let trimmed = path.trim_start_matches('/');
-        base.join(trimmed).expect("valid relative path")
+        match base.join(trimmed) {
+            Ok(url) => url,
+            Err(err) => {
+                error!(
+                    error = %err,
+                    base = %base,
+                    path,
+                    "failed to join url; falling back to base url"
+                );
+                base.clone()
+            }
+        }
     }
 }
