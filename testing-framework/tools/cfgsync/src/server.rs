@@ -190,6 +190,9 @@ async fn validator_config(
                 (StatusCode::OK, Json(value)).into_response()
             }
             RepoResponse::Timeout => (StatusCode::REQUEST_TIMEOUT).into_response(),
+            RepoResponse::Error(message) => {
+                (StatusCode::INTERNAL_SERVER_ERROR, message).into_response()
+            }
         },
     )
 }
@@ -233,6 +236,9 @@ async fn executor_config(
                 (StatusCode::OK, Json(value)).into_response()
             }
             RepoResponse::Timeout => (StatusCode::REQUEST_TIMEOUT).into_response(),
+            RepoResponse::Error(message) => {
+                (StatusCode::INTERNAL_SERVER_ERROR, message).into_response()
+            }
         },
     )
 }

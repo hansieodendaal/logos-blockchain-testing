@@ -9,14 +9,16 @@ use testing_framework_config::topology::configs::{
     GeneralConfig, consensus::ConsensusParams, da::DaParams, wallet::WalletConfig,
 };
 use tokio::{sync::oneshot::Sender, time::timeout};
+use tracing::{error, info, warn};
 
-use crate::{config::builder::create_node_configs, host::Host, server::CfgSyncConfig};
+use crate::{config::builder::try_create_node_configs, host::Host, server::CfgSyncConfig};
 
 const HOST_POLLING_INTERVAL: Duration = Duration::from_secs(1);
 
 pub enum RepoResponse {
     Config(Box<GeneralConfig>),
     Timeout,
+    Error(String),
 }
 
 pub struct ConfigRepo {
@@ -102,12 +104,12 @@ impl ConfigRepo {
             .await
             .is_ok()
         {
-            println!("All hosts have announced their IPs");
+            info!("all hosts have announced their IPs");
 
             let mut waiting_hosts = self.waiting_hosts.lock().unwrap();
             let hosts = waiting_hosts.keys().cloned().collect();
 
-            let configs = create_node_configs(
+            let configs = match try_create_node_configs(
                 &self.consensus_params,
                 &self.da_params,
                 &self.tracing_settings,
@@ -116,14 +118,32 @@ impl ConfigRepo {
                 self.da_ports.clone(),
                 self.blend_ports.clone(),
                 hosts,
-            );
+            ) {
+                Ok(configs) => configs,
+                Err(err) => {
+                    error!(error = %err, "failed to generate node configs");
+                    let message = err.to_string();
+                    for (_, sender) in waiting_hosts.drain() {
+                        let _ = sender.send(RepoResponse::Error(message.clone()));
+                    }
+                    return;
+                }
+            };
 
             for (host, sender) in waiting_hosts.drain() {
-                let config = configs.get(&host).expect("host should have a config");
-                let _ = sender.send(RepoResponse::Config(Box::new(config.to_owned())));
+                match configs.get(&host) {
+                    Some(config) => {
+                        let _ = sender.send(RepoResponse::Config(Box::new(config.to_owned())));
+                    }
+                    None => {
+                        warn!(identifier = %host.identifier, "missing config for host");
+                        let _ =
+                            sender.send(RepoResponse::Error("missing config for host".to_string()));
+                    }
+                }
             }
         } else {
-            println!("Timeout: Not all hosts announced within the time limit");
+            warn!("timeout: not all hosts announced within the time limit");
 
             let mut waiting_hosts = self.waiting_hosts.lock().unwrap();
             for (_, sender) in waiting_hosts.drain() {
