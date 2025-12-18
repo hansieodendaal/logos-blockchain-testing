@@ -39,14 +39,11 @@ Options:
   -e, --executors N       Number of executors (required)
   --bundle PATH           Convenience alias for setting NOMOS_BINARIES_TAR=PATH
   --metrics-query-url URL         PromQL base URL the runner process can query (optional)
-  --metrics-query-grafana-url URL PromQL base URL for a Grafana datasource (optional)
   --metrics-otlp-ingest-url URL   Full OTLP HTTP ingest URL for node metrics export (optional)
   --grafana-url URL               Grafana base URL for printing/logging (optional)
   --external-prometheus URL            Alias for --metrics-query-url
-  --external-prometheus-grafana-url URL Alias for --metrics-query-grafana-url
   --external-otlp-metrics-endpoint URL  Alias for --metrics-otlp-ingest-url
   --local                 Use a local Docker image tag (default for docker-desktop k8s)
-  --ecr                   Use an ECR image reference (default for non-docker-desktop k8s)
   --no-image-build        Skip rebuilding the compose/k8s image (sets NOMOS_SKIP_IMAGE_BUILD=1)
 
 Environment:
@@ -59,19 +56,9 @@ Environment:
   NOMOS_TESTNET_IMAGE_PULL_POLICY  K8s imagePullPolicy (default ${DEFAULT_PULL_POLICY_LOCAL}; set to ${DEFAULT_PULL_POLICY_ECR} for --ecr)
   NOMOS_BINARIES_TAR               Path to prebuilt binaries/circuits tarball (default .tmp/nomos-binaries-<platform>-<version>.tar.gz)
   NOMOS_SKIP_IMAGE_BUILD           Set to 1 to skip rebuilding the compose/k8s image
-  K8S_RUNNER_METRICS_QUERY_URL               PromQL base URL for the runner process
-  NOMOS_METRICS_QUERY_URL                    Alias for K8S_RUNNER_METRICS_QUERY_URL
-  K8S_RUNNER_METRICS_QUERY_GRAFANA_URL       PromQL base URL for Grafana (cluster-reachable)
-  NOMOS_METRICS_QUERY_GRAFANA_URL            Alias for K8S_RUNNER_METRICS_QUERY_GRAFANA_URL
-  K8S_RUNNER_METRICS_OTLP_INGEST_URL         Full OTLP HTTP ingest URL for node metrics export
-  NOMOS_METRICS_OTLP_INGEST_URL              Alias for K8S_RUNNER_METRICS_OTLP_INGEST_URL
-  K8S_RUNNER_GRAFANA_URL                     Grafana base URL for printing/logging (optional)
-  NOMOS_GRAFANA_URL                          Alias for K8S_RUNNER_GRAFANA_URL
-
-Deprecated env vars (still supported):
-  K8S_RUNNER_EXTERNAL_PROMETHEUS_URL, NOMOS_EXTERNAL_PROMETHEUS_URL
-  K8S_RUNNER_EXTERNAL_PROMETHEUS_GRAFANA_URL, NOMOS_EXTERNAL_PROMETHEUS_GRAFANA_URL
-  K8S_RUNNER_EXTERNAL_OTLP_METRICS_ENDPOINT, NOMOS_EXTERNAL_OTLP_METRICS_ENDPOINT
+  NOMOS_METRICS_QUERY_URL           PromQL base URL for the runner process (optional)
+  NOMOS_METRICS_OTLP_INGEST_URL     Full OTLP HTTP ingest URL for node metrics export (optional)
+  NOMOS_GRAFANA_URL                 Grafana base URL for printing/logging (optional)
 EOF
 }
 
@@ -116,7 +103,6 @@ run_examples::parse_args() {
   DEMO_EXECUTORS=""
   IMAGE_SELECTION_MODE="auto"
   METRICS_QUERY_URL=""
-  METRICS_QUERY_GRAFANA_URL=""
   METRICS_OTLP_INGEST_URL=""
   GRAFANA_URL=""
 
@@ -172,14 +158,6 @@ run_examples::parse_args() {
         METRICS_QUERY_URL="${1#*=}"
         shift
         ;;
-      --metrics-query-grafana-url)
-        METRICS_QUERY_GRAFANA_URL="${2:-}"
-        shift 2
-        ;;
-      --metrics-query-grafana-url=*)
-        METRICS_QUERY_GRAFANA_URL="${1#*=}"
-        shift
-        ;;
       --metrics-otlp-ingest-url)
         METRICS_OTLP_INGEST_URL="${2:-}"
         shift 2
@@ -204,14 +182,6 @@ run_examples::parse_args() {
         METRICS_QUERY_URL="${1#*=}"
         shift
         ;;
-      --external-prometheus-grafana-url)
-        METRICS_QUERY_GRAFANA_URL="${2:-}"
-        shift 2
-        ;;
-      --external-prometheus-grafana-url=*)
-        METRICS_QUERY_GRAFANA_URL="${1#*=}"
-        shift
-        ;;
       --external-otlp-metrics-endpoint)
         METRICS_OTLP_INGEST_URL="${2:-}"
         shift 2
@@ -221,17 +191,7 @@ run_examples::parse_args() {
         shift
         ;;
       --local)
-        if [ "${IMAGE_SELECTION_MODE}" = "ecr" ]; then
-          run_examples::fail_with_usage "--local and --ecr are mutually exclusive"
-        fi
         IMAGE_SELECTION_MODE="local"
-        shift
-        ;;
-      --ecr)
-        if [ "${IMAGE_SELECTION_MODE}" = "local" ]; then
-          run_examples::fail_with_usage "--local and --ecr are mutually exclusive"
-        fi
-        IMAGE_SELECTION_MODE="ecr"
         shift
         ;;
       --no-image-build)
@@ -584,19 +544,12 @@ run_examples::run() {
 
   if [ -n "${METRICS_QUERY_URL}" ]; then
     export NOMOS_METRICS_QUERY_URL="${METRICS_QUERY_URL}"
-    export K8S_RUNNER_METRICS_QUERY_URL="${METRICS_QUERY_URL}"
-  fi
-  if [ -n "${METRICS_QUERY_GRAFANA_URL}" ]; then
-    export NOMOS_METRICS_QUERY_GRAFANA_URL="${METRICS_QUERY_GRAFANA_URL}"
-    export K8S_RUNNER_METRICS_QUERY_GRAFANA_URL="${METRICS_QUERY_GRAFANA_URL}"
   fi
   if [ -n "${METRICS_OTLP_INGEST_URL}" ]; then
     export NOMOS_METRICS_OTLP_INGEST_URL="${METRICS_OTLP_INGEST_URL}"
-    export K8S_RUNNER_METRICS_OTLP_INGEST_URL="${METRICS_OTLP_INGEST_URL}"
   fi
   if [ -n "${GRAFANA_URL}" ]; then
     export NOMOS_GRAFANA_URL="${GRAFANA_URL}"
-    export K8S_RUNNER_GRAFANA_URL="${GRAFANA_URL}"
   fi
 
   echo "==> Running ${BIN} for ${RUN_SECS}s (mode=${MODE}, image=${IMAGE})"

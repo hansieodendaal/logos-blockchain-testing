@@ -106,19 +106,6 @@ pub trait ObservabilityBuilderExt: Sized {
     /// Convenience wrapper that parses a URL string (panics if invalid).
     fn with_metrics_query_url_str(self, url: &str) -> CoreScenarioBuilder<ObservabilityCapability>;
 
-    /// Configure the Prometheus-compatible base URL for the k8s runner Grafana
-    /// datasource (must be reachable from inside the cluster).
-    fn with_metrics_query_grafana_url(
-        self,
-        url: reqwest::Url,
-    ) -> CoreScenarioBuilder<ObservabilityCapability>;
-
-    /// Convenience wrapper that parses a URL string (panics if invalid).
-    fn with_metrics_query_grafana_url_str(
-        self,
-        url: &str,
-    ) -> CoreScenarioBuilder<ObservabilityCapability>;
-
     /// Configure the OTLP HTTP metrics ingest endpoint to which nodes should
     /// export metrics (must be a full URL, including any required path).
     fn with_metrics_otlp_ingest_url(
@@ -154,22 +141,6 @@ pub trait ObservabilityBuilderExt: Sized {
         self.with_metrics_query_url_str(url)
     }
 
-    #[deprecated(note = "use with_metrics_query_grafana_url")]
-    fn with_external_prometheus_grafana_url(
-        self,
-        url: reqwest::Url,
-    ) -> CoreScenarioBuilder<ObservabilityCapability> {
-        self.with_metrics_query_grafana_url(url)
-    }
-
-    #[deprecated(note = "use with_metrics_query_grafana_url_str")]
-    fn with_external_prometheus_grafana_url_str(
-        self,
-        url: &str,
-    ) -> CoreScenarioBuilder<ObservabilityCapability> {
-        self.with_metrics_query_grafana_url_str(url)
-    }
-
     #[deprecated(note = "use with_metrics_otlp_ingest_url")]
     fn with_external_otlp_metrics_endpoint(
         self,
@@ -194,7 +165,6 @@ impl ObservabilityBuilderExt for CoreScenarioBuilder<()> {
     ) -> CoreScenarioBuilder<ObservabilityCapability> {
         self.with_capabilities(ObservabilityCapability {
             metrics_query_url: Some(url),
-            metrics_query_grafana_url: None,
             metrics_otlp_ingest_url: None,
             grafana_url: None,
         })
@@ -211,7 +181,6 @@ impl ObservabilityBuilderExt for CoreScenarioBuilder<()> {
     ) -> CoreScenarioBuilder<ObservabilityCapability> {
         self.with_capabilities(ObservabilityCapability {
             metrics_query_url: None,
-            metrics_query_grafana_url: None,
             metrics_otlp_ingest_url: Some(url),
             grafana_url: None,
         })
@@ -225,30 +194,9 @@ impl ObservabilityBuilderExt for CoreScenarioBuilder<()> {
         self.with_metrics_otlp_ingest_url(parsed)
     }
 
-    fn with_metrics_query_grafana_url(
-        self,
-        url: reqwest::Url,
-    ) -> CoreScenarioBuilder<ObservabilityCapability> {
-        self.with_capabilities(ObservabilityCapability {
-            metrics_query_url: None,
-            metrics_query_grafana_url: Some(url),
-            metrics_otlp_ingest_url: None,
-            grafana_url: None,
-        })
-    }
-
-    fn with_metrics_query_grafana_url_str(
-        self,
-        url: &str,
-    ) -> CoreScenarioBuilder<ObservabilityCapability> {
-        let parsed = reqwest::Url::parse(url).expect("metrics query grafana url must be valid");
-        self.with_metrics_query_grafana_url(parsed)
-    }
-
     fn with_grafana_url(self, url: reqwest::Url) -> CoreScenarioBuilder<ObservabilityCapability> {
         self.with_capabilities(ObservabilityCapability {
             metrics_query_url: None,
-            metrics_query_grafana_url: None,
             metrics_otlp_ingest_url: None,
             grafana_url: Some(url),
         })
@@ -288,22 +236,6 @@ impl ObservabilityBuilderExt for CoreScenarioBuilder<ObservabilityCapability> {
     ) -> CoreScenarioBuilder<ObservabilityCapability> {
         let parsed = reqwest::Url::parse(url).expect("metrics OTLP ingest url must be valid");
         self.with_metrics_otlp_ingest_url(parsed)
-    }
-
-    fn with_metrics_query_grafana_url(
-        mut self,
-        url: reqwest::Url,
-    ) -> CoreScenarioBuilder<ObservabilityCapability> {
-        self.capabilities_mut().metrics_query_grafana_url = Some(url);
-        self
-    }
-
-    fn with_metrics_query_grafana_url_str(
-        self,
-        url: &str,
-    ) -> CoreScenarioBuilder<ObservabilityCapability> {
-        let parsed = reqwest::Url::parse(url).expect("metrics query grafana url must be valid");
-        self.with_metrics_query_grafana_url(parsed)
     }
 
     fn with_grafana_url(

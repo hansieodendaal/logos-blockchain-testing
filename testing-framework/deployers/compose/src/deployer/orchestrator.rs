@@ -48,7 +48,7 @@ impl DeploymentOrchestrator {
             .observability_capability()
             .map(ObservabilityInputs::from_capability)
             .unwrap_or_default();
-        let observability = env_inputs.with_overrides(cap_inputs).normalized();
+        let observability = env_inputs.with_overrides(cap_inputs);
 
         let DeploymentContext {
             mut environment,

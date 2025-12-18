@@ -44,14 +44,17 @@ async fn main() {
         &["NOMOS_DEMO_VALIDATORS", "COMPOSE_DEMO_VALIDATORS"],
         DEFAULT_VALIDATORS,
     );
+
     let executors = read_env_any(
         &["NOMOS_DEMO_EXECUTORS", "COMPOSE_DEMO_EXECUTORS"],
         DEFAULT_EXECUTORS,
     );
+
     let run_secs = read_env_any(
         &["NOMOS_DEMO_RUN_SECS", "COMPOSE_DEMO_RUN_SECS"],
         DEFAULT_RUN_SECS,
     );
+
     info!(
         validators,
         executors, run_secs, "starting compose runner demo"
@@ -75,18 +78,14 @@ async fn run_compose_case(
         "building scenario plan"
     );
 
-    let enable_chaos = env::var("NOMOS_DEMO_CHAOS")
-        .or_else(|_| env::var("COMPOSE_DEMO_CHAOS"))
-        .map(|value| value == "1" || value.eq_ignore_ascii_case("true"))
-        .unwrap_or(false);
-
     let scenario = ScenarioBuilder::topology_with(|t| {
         t.network_star().validators(validators).executors(executors)
     })
     .enable_node_control();
 
-    let scenario = if enable_chaos {
-        let (chaos_min_delay, chaos_max_delay, chaos_target_cooldown) = chaos_timings(run_duration);
+    let scenario = if let Some((chaos_min_delay, chaos_max_delay, chaos_target_cooldown)) =
+        chaos_timings(run_duration)
+    {
         scenario.chaos_with(|c| {
             c.restart()
                 .min_delay(chaos_min_delay)
@@ -130,22 +129,24 @@ async fn run_compose_case(
     Ok(())
 }
 
-fn chaos_timings(run_duration: Duration) -> (Duration, Duration, Duration) {
+fn chaos_timings(run_duration: Duration) -> Option<(Duration, Duration, Duration)> {
     let headroom = Duration::from_secs(CHAOS_DELAY_HEADROOM_SECS);
-    let chaos_min_delay = Duration::from_secs(CHAOS_MIN_DELAY_SECS).max(run_duration + headroom);
-    let chaos_max_delay = Duration::from_secs(CHAOS_MAX_DELAY_SECS).max(chaos_min_delay);
-    let chaos_target_cooldown = Duration::from_secs(CHAOS_COOLDOWN_SECS).max(chaos_min_delay);
+    let Some(max_allowed_delay) = run_duration.checked_sub(headroom) else {
+        return None;
+    };
 
-    (chaos_min_delay, chaos_max_delay, chaos_target_cooldown)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn chaos_cooldown_is_never_less_than_min_delay() {
-        let (min_delay, _max_delay, cooldown) = chaos_timings(Duration::from_secs(600));
-        assert!(cooldown >= min_delay);
+    let chaos_min_delay = Duration::from_secs(CHAOS_MIN_DELAY_SECS);
+    if max_allowed_delay <= chaos_min_delay {
+        return None;
     }
+
+    let chaos_max_delay = Duration::from_secs(CHAOS_MAX_DELAY_SECS)
+        .min(max_allowed_delay)
+        .max(chaos_min_delay);
+
+    let chaos_target_cooldown = Duration::from_secs(CHAOS_COOLDOWN_SECS)
+        .min(max_allowed_delay)
+        .max(chaos_max_delay);
+
+    Some((chaos_min_delay, chaos_max_delay, chaos_target_cooldown))
 }

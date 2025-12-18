@@ -140,7 +140,7 @@ async fn deploy_with_observability<Caps>(
     let cap_inputs = observability
         .map(ObservabilityInputs::from_capability)
         .unwrap_or_default();
-    let observability = env_inputs.with_overrides(cap_inputs).normalized();
+    let observability = env_inputs.with_overrides(cap_inputs);
 
     let descriptors = scenario.topology().clone();
     let validator_count = descriptors.validators().len();
@@ -157,10 +157,6 @@ async fn deploy_with_observability<Caps>(
         duration_secs = scenario.duration().as_secs(),
         readiness_checks = deployer.readiness_checks,
         metrics_query_url = observability.metrics_query_url.as_ref().map(|u| u.as_str()),
-        metrics_query_grafana_url = observability
-            .metrics_query_grafana_url
-            .as_ref()
-            .map(|u| u.as_str()),
         metrics_otlp_ingest_url = observability
             .metrics_otlp_ingest_url
             .as_ref()

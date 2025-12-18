@@ -59,31 +59,13 @@ async fn run_k8s_case(validators: usize, executors: usize, run_duration: Duratio
     .with_run_duration(run_duration)
     .expect_consensus_liveness();
 
-    if let Ok(url) = env::var("K8S_RUNNER_METRICS_QUERY_URL")
-        .or_else(|_| env::var("NOMOS_METRICS_QUERY_URL"))
-        .or_else(|_| env::var("K8S_RUNNER_EXTERNAL_PROMETHEUS_URL"))
-        .or_else(|_| env::var("NOMOS_EXTERNAL_PROMETHEUS_URL"))
-    {
+    if let Ok(url) = env::var("NOMOS_METRICS_QUERY_URL") {
         if !url.trim().is_empty() {
             scenario = scenario.with_metrics_query_url_str(url.trim());
         }
     }
 
-    if let Ok(url) = env::var("K8S_RUNNER_METRICS_QUERY_GRAFANA_URL")
-        .or_else(|_| env::var("NOMOS_METRICS_QUERY_GRAFANA_URL"))
-        .or_else(|_| env::var("K8S_RUNNER_EXTERNAL_PROMETHEUS_GRAFANA_URL"))
-        .or_else(|_| env::var("NOMOS_EXTERNAL_PROMETHEUS_GRAFANA_URL"))
-    {
-        if !url.trim().is_empty() {
-            scenario = scenario.with_metrics_query_grafana_url_str(url.trim());
-        }
-    }
-
-    if let Ok(url) = env::var("K8S_RUNNER_METRICS_OTLP_INGEST_URL")
-        .or_else(|_| env::var("NOMOS_METRICS_OTLP_INGEST_URL"))
-        .or_else(|_| env::var("K8S_RUNNER_EXTERNAL_OTLP_METRICS_ENDPOINT"))
-        .or_else(|_| env::var("NOMOS_EXTERNAL_OTLP_METRICS_ENDPOINT"))
-    {
+    if let Ok(url) = env::var("NOMOS_METRICS_OTLP_INGEST_URL") {
         if !url.trim().is_empty() {
             scenario = scenario.with_metrics_otlp_ingest_url_str(url.trim());
         }

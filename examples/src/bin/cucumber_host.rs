@@ -4,5 +4,6 @@ use runner_examples::cucumber::{Mode, init_logging_defaults, init_tracing, run};
 async fn main() {
     init_logging_defaults();
     init_tracing();
+
     run(Mode::Host).await;
 }

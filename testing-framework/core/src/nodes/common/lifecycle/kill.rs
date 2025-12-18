@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::process::Child;
 
 /// Shared cleanup helpers for child processes.
