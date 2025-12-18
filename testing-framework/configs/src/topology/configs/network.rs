@@ -5,6 +5,7 @@ use nomos_libp2p::{
 };
 use nomos_node::config::network::serde::{BackendSettings, Config, SwarmConfig};
 use nomos_utils::net::get_available_udp_port;
+use thiserror::Error;
 
 use crate::node_address_from_port;
 
@@ -24,6 +25,12 @@ pub struct NetworkParams {
 }
 
 pub type GeneralNetworkConfig = Config;
+
+#[derive(Debug, Error)]
+pub enum NetworkConfigError {
+    #[error("failed to allocate a free UDP port for libp2p swarm")]
+    PortAllocationFailed,
+}
 
 fn default_swarm_config() -> SwarmConfig {
     SwarmConfig {
@@ -55,7 +62,7 @@ fn nat_settings(port: u16) -> NatSettings {
 pub fn create_network_configs(
     ids: &[[u8; 32]],
     network_params: &NetworkParams,
-) -> Vec<GeneralNetworkConfig> {
+) -> Result<Vec<GeneralNetworkConfig>, NetworkConfigError> {
     let swarm_configs: Vec<SwarmConfig> = ids
         .iter()
         .map(|id| {
@@ -63,8 +70,8 @@ pub fn create_network_configs(
             let node_key = ed25519::SecretKey::try_from_bytes(&mut node_key_bytes)
                 .expect("Failed to generate secret key from bytes");
 
-            let port = get_available_udp_port().unwrap();
-            SwarmConfig {
+            let port = get_available_udp_port().ok_or(NetworkConfigError::PortAllocationFailed)?;
+            Ok(SwarmConfig {
                 node_key,
                 port,
                 chain_sync_config: cryptarchia_sync::Config {
@@ -72,13 +79,13 @@ pub fn create_network_configs(
                 },
                 nat_config: nat_settings(port),
                 ..default_swarm_config()
-            }
+            })
         })
-        .collect();
+        .collect::<Result<_, _>>()?;
 
     let all_initial_peers = initial_peers_by_network_layout(&swarm_configs, network_params);
 
-    swarm_configs
+    Ok(swarm_configs
         .iter()
         .zip(all_initial_peers)
         .map(|(swarm_config, initial_peers)| GeneralNetworkConfig {
@@ -87,7 +94,7 @@ pub fn create_network_configs(
                 swarm: swarm_config.to_owned(),
             },
         })
-        .collect()
+        .collect())
 }
 
 fn initial_peers_by_network_layout(

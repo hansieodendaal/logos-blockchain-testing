@@ -66,6 +66,8 @@ pub enum NodeConfigBuildError {
     Providers(#[from] ProviderBuildError),
     #[error(transparent)]
     Da(#[from] da::DaConfigError),
+    #[error(transparent)]
+    Network(#[from] network::NetworkConfigError),
     #[error("failed to allocate an available UDP port")]
     PortAllocFailed,
     #[error("failed to parse multiaddr '{value}': {message}")]
@@ -271,7 +273,7 @@ fn build_base_configs(
         consensus_configs: create_consensus_configs(ids, consensus_params, wallet_config),
         bootstrap_configs: create_bootstrap_configs(ids, SHORT_PROLONGED_BOOTSTRAP_PERIOD),
         da_configs: try_create_da_configs(ids, da_params, da_ports)?,
-        network_configs: create_network_configs(ids, &NetworkParams::default()),
+        network_configs: create_network_configs(ids, &NetworkParams::default())?,
         blend_configs: create_blend_configs(ids, blend_ports),
     })
 }

@@ -14,7 +14,7 @@ use testing_framework_config::topology::{
             ConsensusParams, ProviderInfo, create_consensus_configs,
             create_genesis_tx_with_declarations,
         },
-        da::{DaParams, create_da_configs},
+        da::{DaParams, try_create_da_configs},
         network::{Libp2pNetworkLayout, NetworkParams, create_network_configs},
         tracing::create_tracing_configs,
         wallet::WalletConfig,
@@ -267,10 +267,12 @@ impl TopologyBuilder {
         let mut consensus_configs =
             create_consensus_configs(&ids, &config.consensus_params, &config.wallet_config);
         let bootstrapping_config = create_bootstrap_configs(&ids, SHORT_PROLONGED_BOOTSTRAP_PERIOD);
-        let da_configs = create_da_configs(&ids, &config.da_params, &da_ports);
-        let network_configs = create_network_configs(&ids, &config.network_params);
+        let da_configs = try_create_da_configs(&ids, &config.da_params, &da_ports)
+            .expect("failed to create DA configs");
+        let network_configs = create_network_configs(&ids, &config.network_params)
+            .expect("failed to create network configs");
         let blend_configs = create_blend_configs(&ids, &blend_ports);
-        let api_configs = create_api_configs(&ids);
+        let api_configs = create_api_configs(&ids).expect("failed to create API configs");
         let tracing_configs = create_tracing_configs(&ids);
         let time_config = default_time_config();
 

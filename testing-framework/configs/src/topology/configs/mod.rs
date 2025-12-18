@@ -96,9 +96,11 @@ pub fn create_general_configs_with_blend_core_subset(
         consensus::create_consensus_configs(&ids, &consensus_params, &WalletConfig::default());
     let bootstrap_config =
         bootstrap::create_bootstrap_configs(&ids, SHORT_PROLONGED_BOOTSTRAP_PERIOD);
-    let network_configs = network::create_network_configs(&ids, network_params);
-    let da_configs = da::create_da_configs(&ids, &DaParams::default(), &da_ports);
-    let api_configs = api::create_api_configs(&ids);
+    let network_configs =
+        network::create_network_configs(&ids, network_params).expect("network config generation");
+    let da_configs =
+        da::try_create_da_configs(&ids, &DaParams::default(), &da_ports).expect("DA configs");
+    let api_configs = api::create_api_configs(&ids).expect("api config generation");
     let blend_configs = blend::create_blend_configs(&ids, &blend_ports);
     let tracing_configs = tracing::create_tracing_configs(&ids);
     let time_config = time::default_time_config();

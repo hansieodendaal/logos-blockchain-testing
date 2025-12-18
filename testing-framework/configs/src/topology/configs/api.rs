@@ -1,6 +1,7 @@
 use std::net::SocketAddr;
 
 use nomos_utils::net::get_available_tcp_port;
+use thiserror::Error;
 
 #[derive(Clone)]
 pub struct GeneralApiConfig {
@@ -8,16 +9,23 @@ pub struct GeneralApiConfig {
     pub testing_http_address: SocketAddr,
 }
 
-#[must_use]
-pub fn create_api_configs(ids: &[[u8; 32]]) -> Vec<GeneralApiConfig> {
+#[derive(Debug, Error)]
+pub enum ApiConfigError {
+    #[error("failed to allocate a free TCP port for API config")]
+    PortAllocationFailed,
+}
+
+pub fn create_api_configs(ids: &[[u8; 32]]) -> Result<Vec<GeneralApiConfig>, ApiConfigError> {
     ids.iter()
-        .map(|_| GeneralApiConfig {
-            address: format!("127.0.0.1:{}", get_available_tcp_port().unwrap())
-                .parse()
-                .unwrap(),
-            testing_http_address: format!("127.0.0.1:{}", get_available_tcp_port().unwrap())
-                .parse()
-                .unwrap(),
+        .map(|_| {
+            let address_port =
+                get_available_tcp_port().ok_or(ApiConfigError::PortAllocationFailed)?;
+            let testing_port =
+                get_available_tcp_port().ok_or(ApiConfigError::PortAllocationFailed)?;
+            Ok(GeneralApiConfig {
+                address: format!("127.0.0.1:{address_port}").parse().unwrap(),
+                testing_http_address: format!("127.0.0.1:{testing_port}").parse().unwrap(),
+            })
         })
         .collect()
 }
