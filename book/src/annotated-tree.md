@@ -90,7 +90,7 @@ Helper utilities:
 - `NOMOS_LOG_FILTER` — Target-specific filtering (e.g., `cryptarchia=trace,nomos_da_sampling=debug`)
 - `NOMOS_TESTS_TRACING` — Enable file logging for local runner
 
-See [Logging and Observability](operations.md#logging-and-observability) for details.
+See [Logging & Observability](logging-observability.md) for details.
 
 ## Navigation Guide
 

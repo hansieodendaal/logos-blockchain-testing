@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 readonly DEFAULT_TAG="test"
 readonly DEFAULT_ECR_IMAGE_REPO="public.ecr.aws/r4s5t9y4/logos/logos-blockchain"
@@ -32,7 +32,7 @@ export DOCKER_DEFAULT_PLATFORM="${DEFAULT_DOCKER_PLATFORM}"
 export CIRCUITS_PLATFORM="${CIRCUITS_PLATFORM:-${DEFAULT_CIRCUITS_PLATFORM}}"
 export IMAGE_TAG="${REMOTE_IMAGE}"
 
-  "${ROOT_DIR}/scripts/build_test_image.sh" --dockerfile "${ROOT_DIR}/testing-framework/assets/stack/Dockerfile.testnet"
+  "${ROOT_DIR}/scripts/build/build_test_image.sh" --dockerfile "${ROOT_DIR}/testing-framework/assets/stack/Dockerfile.testnet"
 
 if [[ "${ECR_IMAGE_REPO}" == ${PUBLIC_ECR_HOST}/* ]]; then
   aws ecr-public get-login-password --region "${AWS_REGION}" \

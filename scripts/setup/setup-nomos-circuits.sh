@@ -28,7 +28,7 @@ readonly ICON_ERR="✗"
 
 setup_nomos_circuits::usage() {
   cat <<EOF
-Usage: scripts/setup-nomos-circuits.sh [VERSION] [INSTALL_DIR]
+Usage: scripts/setup/setup-nomos-circuits.sh [VERSION] [INSTALL_DIR]
 
 Arguments:
   VERSION      Optional. Version to install (default: ${DEFAULT_CIRCUITS_VERSION})
@@ -235,7 +235,7 @@ setup_nomos_circuits::maybe_rebuild_rapidsnark() {
   if [[ "${REBUILD_REQUIRED}" == "1" ]]; then
     echo
     setup_nomos_circuits::print_info "Rebuilding rapidsnark prover for ${PLATFORM}..."
-    "${SCRIPT_DIR}/scripts/build-rapidsnark.sh" "${INSTALL_DIR}"
+    "${SCRIPT_DIR}/build/build-rapidsnark.sh" "${INSTALL_DIR}"
   else
     setup_nomos_circuits::print_info "Skipping rapidsnark rebuild (set NOMOS_CIRCUITS_REBUILD_RAPIDSNARK=1 to force)."
   fi

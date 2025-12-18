@@ -77,7 +77,7 @@ if [ -f "/opt/circuits/prover" ]; then
   if [ -n "${PROVER_INFO}" ] && ! echo "${PROVER_INFO}" | grep -qi "${EXPECT_ARCH}"; then
     echo "Circuits prover architecture (${PROVER_INFO}) does not match target ${TARGET_ARCH}; rebuilding rapidsnark binaries"
     RAPIDSNARK_FORCE_REBUILD=1 \
-      scripts/build-rapidsnark.sh /opt/circuits
+      scripts/build/build-rapidsnark.sh /opt/circuits
   fi
 fi
 
@@ -86,6 +86,5 @@ if [ "${require_linux_execs}" -eq 1 ] || [ ! -f "/opt/circuits/pol/verification_
   NOMOS_CIRCUITS_PLATFORM="${CIRCUITS_PLATFORM}" \
   NOMOS_CIRCUITS_REBUILD_RAPIDSNARK=1 \
   RAPIDSNARK_BUILD_GMP=1 \
-    scripts/setup-nomos-circuits.sh "${VERSION}" "/opt/circuits"
+    scripts/setup/setup-nomos-circuits.sh "${VERSION}" "/opt/circuits"
 fi
-

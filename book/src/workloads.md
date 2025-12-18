@@ -21,7 +21,7 @@ scenarios stay readable and purpose-driven.
   criteria (e.g., inclusion of submitted activity) so scenarios remain concise.
 
 Together, workloads and expectations let you express both the pressure applied
-to the system and the definition of “healthy” for that run.
+to the system and the definition of "healthy" for that run.
 
 ```mermaid
 flowchart TD
@@ -30,3 +30,9 @@ flowchart TD
     Drive --> Collect[Collect signals]
     Collect --> Eval[Expectations evaluate]
 ```
+
+## See Also
+
+- **[RunContext: BlockFeed & Node Control](node-control.md)** — Learn how to use BlockFeed in expectations to observe blocks in real-time, and how to access node control for chaos testing
+- **[Examples](examples.md)** — Concrete scenario patterns combining workloads and expectations
+- **[Extending the Framework](extending.md)** — Implement custom workloads and expectations

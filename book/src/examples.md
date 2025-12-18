@@ -3,12 +3,17 @@
 Concrete scenario shapes that illustrate how to combine topologies, workloads,
 and expectations.
 
+**View Complete Source Code:**
+- [local_runner.rs](https://github.com/logos-co/nomos-node/blob/master/testnet/testing-framework/runner-examples/src/bin/local_runner.rs) — Host processes (local)
+- [compose_runner.rs](https://github.com/logos-co/nomos-node/blob/master/testnet/testing-framework/runner-examples/src/bin/compose_runner.rs) — Docker Compose
+- [k8s_runner.rs](https://github.com/logos-co/nomos-node/blob/master/testnet/testing-framework/runner-examples/src/bin/k8s_runner.rs) — Kubernetes
+
 **Runnable examples:** The repo includes complete binaries in `examples/src/bin/`:
 - `local_runner.rs` — Host processes (local)
 - `compose_runner.rs` — Docker Compose (requires image built)
 - `k8s_runner.rs` — Kubernetes (requires cluster access and image loaded)
 
-**Recommended:** Use `scripts/run-examples.sh -t <duration> -v <validators> -e <executors> <mode>` where mode is `host`, `compose`, or `k8s`.
+**Recommended:** Use `scripts/run/run-examples.sh -t <duration> -v <validators> -e <executors> <mode>` where mode is `host`, `compose`, or `k8s`.
 
 **Alternative:** Direct cargo run: `POL_PROOF_DEV_MODE=true cargo run -p runner-examples --bin <name>`
 

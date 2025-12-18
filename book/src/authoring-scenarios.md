@@ -14,7 +14,7 @@ Creating a scenario is a declarative exercise:
    block progression and the effects of your workloads.
 5. **Choose a runner**: target local processes for fast iteration, Docker
    Compose for reproducible multi-node stacks, or Kubernetes for cluster-grade
-   validation. For environment considerations, see [Operations](operations.md).
+   validation. For environment considerations, see [Operations Overview](operations-overview.md).
 
 Keep scenarios small and explicit: make the intended behavior and the success
 criteria clear so failures are easy to interpret and act upon.

@@ -2,7 +2,7 @@
 #
 # Rebuild the rapidsnark prover for the current architecture.
 #
-# Usage: ./scripts/build-rapidsnark.sh <circuits_dir>
+# Usage: ./scripts/build/build-rapidsnark.sh <circuits_dir>
 
 set -euo pipefail
 

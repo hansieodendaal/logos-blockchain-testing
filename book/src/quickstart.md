@@ -23,7 +23,7 @@ The framework ships with runnable example binaries in `examples/src/bin/`.
 
 ```bash
 # From the logos-blockchain-testing directory
-scripts/run-examples.sh -t 60 -v 1 -e 1 host
+scripts/run/run-examples.sh -t 60 -v 1 -e 1 host
 ```
 
 This handles circuit setup, binary building, and runs a complete scenario: 1 validator + 1 executor, mixed transaction + DA workload (5 tx/block + 1 channel + 1 blob), 60s duration.
@@ -191,7 +191,7 @@ pub async fn step_6_deploy_and_execute() -> Result<()> {
 
 ```bash
 # Scale up to 3 validators + 2 executors, run for 2 minutes
-scripts/run-examples.sh -t 120 -v 3 -e 2 host
+scripts/run/run-examples.sh -t 120 -v 3 -e 2 host
 ```
 
 **With direct cargo run:**
@@ -212,7 +212,7 @@ Use the same API with a different deployer for reproducible containerized enviro
 **Recommended:** Use the convenience script (handles everything):
 
 ```bash
-scripts/run-examples.sh -t 60 -v 1 -e 1 compose
+scripts/run/run-examples.sh -t 60 -v 1 -e 1 compose
 ```
 
 This automatically:
@@ -225,13 +225,13 @@ This automatically:
 
 ```bash
 # Option 1: Use prebuilt bundle (recommended for compose/k8s)
-scripts/build-bundle.sh --platform linux  # Creates .tmp/nomos-binaries-linux-v0.3.1.tar.gz
+scripts/build/build-bundle.sh --platform linux  # Creates .tmp/nomos-binaries-linux-v0.3.1.tar.gz
 export NOMOS_BINARIES_TAR=.tmp/nomos-binaries-linux-v0.3.1.tar.gz
 
 # Option 2: Manual circuit/image setup (rebuilds during image build)
-scripts/setup-nomos-circuits.sh v0.3.1 /tmp/nomos-circuits
+scripts/setup/setup-nomos-circuits.sh v0.3.1 /tmp/nomos-circuits
 cp -r /tmp/nomos-circuits/* testing-framework/assets/stack/kzgrs_test_params/
-scripts/build_test_image.sh
+scripts/build/build_test_image.sh
 
 # Run with Compose
 NOMOS_TESTNET_IMAGE=logos-blockchain-testing:local \
@@ -246,8 +246,8 @@ cargo run -p runner-examples --bin compose_runner
 The runner can integrate with external observability endpoints. For a ready-to-run local stack:
 
 ```bash
-scripts/setup-observability.sh compose up
-eval "$(scripts/setup-observability.sh compose env)"
+scripts/setup/setup-observability.sh compose up
+eval "$(scripts/setup/setup-observability.sh compose env)"
 ```
 
 Then run your compose scenario as usual (the environment variables enable PromQL querying and node OTLP metrics export).

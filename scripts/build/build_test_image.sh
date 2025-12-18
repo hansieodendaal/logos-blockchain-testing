@@ -6,11 +6,11 @@ if [ -z "${BASH_VERSION:-}" ]; then
 fi
 
 # shellcheck disable=SC1091
-. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../lib/common.sh"
 
 build_test_image::usage() {
   cat <<'USAGE'
-Usage: scripts/build_test_image.sh [options]
+Usage: scripts/build/build_test_image.sh [options]
 
 Builds the compose/k8s test image (bakes in binaries + circuit assets).
 

@@ -26,13 +26,13 @@ This framework enables you to define, deploy, and execute integration tests for 
 
 ```bash
 # Host mode (local processes) - fastest iteration
-scripts/run-examples.sh -t 60 -v 1 -e 1 host
+scripts/run/run-examples.sh -t 60 -v 1 -e 1 host
 
 # Compose mode (Docker containers) - reproducible environment
-scripts/run-examples.sh -t 60 -v 1 -e 1 compose
+scripts/run/run-examples.sh -t 60 -v 1 -e 1 compose
 
 # K8s mode (Kubernetes cluster) - production-like fidelity
-scripts/run-examples.sh -t 60 -v 1 -e 1 k8s
+scripts/run/run-examples.sh -t 60 -v 1 -e 1 k8s
 ```
 
 The script handles circuit setup, binary building, image preparation, and scenario execution automatically.
@@ -101,7 +101,7 @@ cd book && mdbook serve
 cargo test
 
 # Run integration examples
-scripts/run-examples.sh -t 60 -v 2 -e 1 host
+scripts/run/run-examples.sh -t 60 -v 2 -e 1 host
 ```
 
 ### Creating Prebuilt Bundles
@@ -110,11 +110,11 @@ For compose/k8s deployments, you can create prebuilt bundles to speed up image b
 
 ```bash
 # Build Linux bundle (required for compose/k8s)
-scripts/build-bundle.sh --platform linux
+scripts/build/build-bundle.sh --platform linux
 
 # Use the bundle when building images
 export NOMOS_BINARIES_TAR=.tmp/nomos-binaries-linux-v0.3.1.tar.gz
-scripts/build_test_image.sh
+scripts/build/build_test_image.sh
 ```
 
 ## Environment Variables
@@ -123,7 +123,7 @@ Key environment variables for customization:
 
 | Variable | Purpose | Default |
 |----------|---------|---------|
-| `POL_PROOF_DEV_MODE=true` | **Required** — Disable expensive proof generation (set automatically by `scripts/run-examples.sh`) | (none) |
+| `POL_PROOF_DEV_MODE=true` | **Required** — Disable expensive proof generation (set automatically by `scripts/run/run-examples.sh`) | (none) |
 | `NOMOS_TESTNET_IMAGE` | Docker image tag for compose/k8s | `logos-blockchain-testing:local` |
 | `NOMOS_DEMO_VALIDATORS` | Number of validator nodes | Varies by example |
 | `NOMOS_DEMO_EXECUTORS` | Number of executor nodes | Varies by example |

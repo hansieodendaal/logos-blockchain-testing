@@ -108,11 +108,11 @@ pub async fn build_local_image(
 
     tracing::info!(
         image,
-        "building compose test image via scripts/build_test_image.sh"
+        "building compose test image via scripts/build/build_test_image.sh"
     );
 
     let mut cmd = Command::new("bash");
-    cmd.arg(repo_root.join("scripts/build_test_image.sh"))
+    cmd.arg(repo_root.join("scripts/build/build_test_image.sh"))
         .arg("--tag")
         .arg(image)
         .arg("--dockerfile")
@@ -152,7 +152,7 @@ pub async fn build_local_image(
             "test image build timed out"
         );
         ComposeRunnerError::Compose(ComposeCommandError::Timeout {
-            command: String::from("scripts/build_test_image.sh"),
+            command: String::from("scripts/build/build_test_image.sh"),
             timeout: testing_framework_core::adjust_timeout(IMAGE_BUILD_TIMEOUT),
         })
     })?;
@@ -165,7 +165,7 @@ pub async fn build_local_image(
         Ok(code) => {
             warn!(image, status = ?code, "test image build failed");
             Err(ComposeRunnerError::Compose(ComposeCommandError::Failed {
-                command: String::from("scripts/build_test_image.sh"),
+                command: String::from("scripts/build/build_test_image.sh"),
                 status: code,
             }))
         }

@@ -37,7 +37,7 @@ The framework is consumed via **runnable example binaries** in `examples/src/bin
 **Recommended:** Use the convenience script:
 
 ```bash
-scripts/run-examples.sh -t <duration> -v <validators> -e <executors> <mode>
+scripts/run/run-examples.sh -t <duration> -v <validators> -e <executors> <mode>
 # mode: host, compose, or k8s
 ```
 
@@ -97,18 +97,18 @@ Three deployer implementations:
 ## Assets and Images
 
 ### Docker Image
-Built via `scripts/build_test_image.sh`:
+Built via `scripts/build/build_test_image.sh`:
 - Embeds KZG circuit parameters and binaries from `testing-framework/assets/stack/kzgrs_test_params/kzgrs_test_params`
 - Includes runner scripts: `run_nomos_node.sh`, `run_nomos_executor.sh`
 - Tagged as `NOMOS_TESTNET_IMAGE` (default: `logos-blockchain-testing:local`)
-- **Recommended:** Use prebuilt bundle via `scripts/build-bundle.sh --platform linux` and set `NOMOS_BINARIES_TAR` before building image
+- **Recommended:** Use prebuilt bundle via `scripts/build/build-bundle.sh --platform linux` and set `NOMOS_BINARIES_TAR` before building image
 
 ### Circuit Assets
 KZG parameters required for DA workloads:
 - **Host path:** `testing-framework/assets/stack/kzgrs_test_params/kzgrs_test_params` (note repeated filename—directory contains file `kzgrs_test_params`)
 - **Container path:** `/kzgrs_test_params/kzgrs_test_params` (for compose/k8s)
 - **Override:** `NOMOS_KZGRS_PARAMS_PATH=/custom/path/to/file` (must point to file)
-- **Fetch via:** `scripts/setup-nomos-circuits.sh v0.3.1 /tmp/circuits` or use `scripts/run-examples.sh`
+- **Fetch via:** `scripts/setup/setup-nomos-circuits.sh v0.3.1 /tmp/circuits` or use `scripts/run/run-examples.sh`
 
 ### Compose Stack
 Templates and configs in `testing-framework/runners/compose/assets/`:
@@ -152,4 +152,4 @@ Templates and configs in `testing-framework/runners/compose/assets/`:
 - Metrics endpoint: `NOMOS_OTLP_METRICS_ENDPOINT=http://localhost:4318`
 - Disabled by default (no noise if unset)
 
-For detailed logging configuration, see [Logging and Observability](operations.md#logging-and-observability).
+For detailed logging configuration, see [Logging & Observability](logging-observability.md).

@@ -6,14 +6,14 @@ if [ -z "${BASH_VERSION:-}" ]; then
 fi
 
 # shellcheck disable=SC1091
-. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../lib/common.sh"
 
 update_nomos_rev::usage() {
   cat <<'EOF'
 Usage:
-  scripts/update-nomos-rev.sh --rev <git_rev>
-  scripts/update-nomos-rev.sh --path <local_dir>
-  scripts/update-nomos-rev.sh --unskip-worktree
+  scripts/ops/update-nomos-rev.sh --rev <git_rev>
+  scripts/ops/update-nomos-rev.sh --path <local_dir>
+  scripts/ops/update-nomos-rev.sh --unskip-worktree
 
 Notes:
   --rev   sets NOMOS_NODE_REV and updates Cargo.toml revs

@@ -6,11 +6,11 @@ if [ -z "${BASH_VERSION:-}" ]; then
 fi
 
 # shellcheck disable=SC1091
-. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../lib/common.sh"
 
 clean::usage() {
   cat <<'USAGE'
-Usage: scripts/clean.sh [options]
+Usage: scripts/ops/clean.sh [options]
 
 Removes local build artifacts that commonly cause disk pressure and flaky Docker builds.
 

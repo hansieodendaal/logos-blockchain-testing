@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
-. "${SCRIPT_DIR}/common.sh"
+. "${SCRIPT_DIR}/../lib/common.sh"
 
 common::ensure_bash "$@"
 
@@ -12,8 +12,8 @@ ROOT="$(common::repo_root)"
 usage() {
   cat <<'USAGE'
 Usage:
-  scripts/setup-observability.sh compose up|down|logs|env
-  scripts/setup-observability.sh k8s install|uninstall|dashboards|env
+  scripts/setup/setup-observability.sh compose up|down|logs|env
+  scripts/setup/setup-observability.sh k8s install|uninstall|dashboards|env
 
 Compose:
   - Runs Prometheus (+ OTLP receiver) and Grafana via docker compose.

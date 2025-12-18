@@ -15,4 +15,4 @@ Running a scenario follows the same conceptual flow regardless of environment:
 
 Use the same plan across different deployers to compare behavior between local
 development and CI or cluster settings. For environment prerequisites and
-flags, see [Operations](operations.md).
+flags, see [Prerequisites & Setup](prerequisites.md) and [Environment Variables](environment-variables.md).

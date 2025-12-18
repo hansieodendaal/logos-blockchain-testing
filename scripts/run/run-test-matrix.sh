@@ -6,11 +6,11 @@ if [ -z "${BASH_VERSION:-}" ]; then
 fi
 
 # shellcheck disable=SC1091
-. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../lib/common.sh"
 
 matrix::usage() {
   cat <<'USAGE'
-Usage: scripts/run-test-matrix.sh [options]
+Usage: scripts/run/run-test-matrix.sh [options]
 
 Runs a small matrix of runner examples (host/compose/k8s) with and without
 image rebuilds (where it makes sense), after cleaning and rebuilding bundles.
@@ -20,11 +20,11 @@ Options:
   -v, --validators N      Validators (default: 1)
   -e, --executors N       Executors (default: 1)
   --modes LIST            Comma-separated: host,compose,k8s (default: host,compose,k8s)
-  --no-clean              Skip scripts/clean.sh step
-  --no-bundles            Skip scripts/build-bundle.sh (uses existing .tmp tarballs)
+  --no-clean              Skip scripts/ops/clean.sh step
+  --no-bundles            Skip scripts/build/build-bundle.sh (uses existing .tmp tarballs)
   --force-k8s-image-build Allow the k8s "rebuild image" run even on non-docker-desktop clusters
-  --metrics-query-url URL       Forwarded to scripts/run-examples.sh (optional)
-  --metrics-otlp-ingest-url URL Forwarded to scripts/run-examples.sh (optional)
+  --metrics-query-url URL       Forwarded to scripts/run/run-examples.sh (optional)
+  --metrics-otlp-ingest-url URL Forwarded to scripts/run/run-examples.sh (optional)
   -h, --help              Show this help
 
 Notes:
@@ -108,7 +108,8 @@ matrix::run_case() {
   shift
 
   local log="${LOG_DIR}/${name}.log"
-  echo "==> [${name}] $(date -Is)"
+  mkdir -p "$(dirname "${log}")"
+  echo "==> [${name}] $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
   echo "==> [${name}] cmd: $*"
 
   local start end status
@@ -156,13 +157,13 @@ matrix::main() {
 
   if [ "${DO_CLEAN}" -eq 1 ]; then
     echo "==> Cleaning workspace artifacts"
-    "${ROOT_DIR}/scripts/clean.sh" --tmp --target --docker
+    "${ROOT_DIR}/scripts/ops/clean.sh" --tmp --target --docker
   fi
 
   if [ "${DO_BUNDLES}" -eq 1 ]; then
     echo "==> Building bundles (host + linux)"
-    "${ROOT_DIR}/scripts/build-bundle.sh" --platform host
-    "${ROOT_DIR}/scripts/build-bundle.sh" --platform linux
+    "${ROOT_DIR}/scripts/build/build-bundle.sh" --platform host
+    "${ROOT_DIR}/scripts/build/build-bundle.sh" --platform linux
   fi
 
   CASE_NAMES=()
@@ -177,20 +178,20 @@ matrix::main() {
     case "${mode}" in
       host)
         matrix::run_case "host" \
-          "${ROOT_DIR}/scripts/run-examples.sh" \
+          "${ROOT_DIR}/scripts/run/run-examples.sh" \
             -t "${RUN_SECS}" -v "${VALIDATORS}" -e "${EXECUTORS}" \
             "${forward[@]}" \
             host
         ;;
       compose)
         matrix::run_case "compose.image_build" \
-          "${ROOT_DIR}/scripts/run-examples.sh" \
+          "${ROOT_DIR}/scripts/run/run-examples.sh" \
             -t "${RUN_SECS}" -v "${VALIDATORS}" -e "${EXECUTORS}" \
             "${forward[@]}" \
             compose
 
         matrix::run_case "compose.skip_image_build" \
-          "${ROOT_DIR}/scripts/run-examples.sh" \
+          "${ROOT_DIR}/scripts/run/run-examples.sh" \
             --no-image-build \
             -t "${RUN_SECS}" -v "${VALIDATORS}" -e "${EXECUTORS}" \
             "${forward[@]}" \
@@ -211,7 +212,7 @@ matrix::main() {
             export NOMOS_FORCE_IMAGE_BUILD=1
           fi
           matrix::run_case "k8s.image_build" \
-            "${ROOT_DIR}/scripts/run-examples.sh" \
+            "${ROOT_DIR}/scripts/run/run-examples.sh" \
               -t "${RUN_SECS}" -v "${VALIDATORS}" -e "${EXECUTORS}" \
               "${forward[@]}" \
               k8s
@@ -221,7 +222,7 @@ matrix::main() {
         fi
 
         matrix::run_case "k8s.skip_image_build" \
-          "${ROOT_DIR}/scripts/run-examples.sh" \
+          "${ROOT_DIR}/scripts/run/run-examples.sh" \
             --no-image-build \
             -t "${RUN_SECS}" -v "${VALIDATORS}" -e "${EXECUTORS}" \
             "${forward[@]}" \

@@ -6,11 +6,11 @@ if [ -z "${BASH_VERSION:-}" ]; then
 fi
 
 # shellcheck disable=SC1091
-. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../lib/common.sh"
 
 checks::usage() {
   cat <<'USAGE'
-Usage: scripts/checks.sh [--help]
+Usage: scripts/run/checks.sh [--help]
 
 Runs a best-effort local environment sanity check for the testing framework
 (assets, Rust, Docker, Kubernetes).
@@ -97,7 +97,7 @@ checks::print_kzg_params() {
   if [ -f "${host_kzg_path}" ]; then
     checks::ok "KZG params file exists"
   else
-    checks::warn "KZG params file missing (DA workloads will fail); run: scripts/run-examples.sh <mode> (auto) or scripts/setup-nomos-circuits.sh"
+    checks::warn "KZG params file missing (DA workloads will fail); run: scripts/run/run-examples.sh <mode> (auto) or scripts/setup/setup-nomos-circuits.sh"
   fi
 }
 
@@ -295,7 +295,7 @@ checks::main() {
   checks::print_debug_flags
 
   checks::section "Done"
-  checks::say "If something looks off, start with: scripts/run-examples.sh <mode> -t 60 -v 1 -e 1"
+  checks::say "If something looks off, start with: scripts/run/run-examples.sh <mode> -t 60 -v 1 -e 1"
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then

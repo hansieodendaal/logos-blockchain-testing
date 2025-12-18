@@ -2,7 +2,7 @@
 
 Runners turn a scenario plan into a live environment while keeping the plan
 unchanged. Choose based on feedback speed, reproducibility, and fidelity. For
-environment and operational considerations, see [Operations](operations.md).
+environment and operational considerations, see [Operations Overview](operations-overview.md).
 
 **Important:** All runners require `POL_PROOF_DEV_MODE=true` to avoid expensive Groth16 proof generation that causes timeouts.
 
@@ -14,7 +14,7 @@ environment and operational considerations, see [Operations](operations.md).
 - **Can run in CI** for fast smoke tests.
 - **Node control:** Not supported (chaos workloads not available)
 
-**Run with:** `scripts/run-examples.sh -t 60 -v 1 -e 1 host`
+**Run with:** `scripts/run/run-examples.sh -t 60 -v 1 -e 1 host`
 
 ## Docker Compose runner
 - Starts nodes in containers to provide a reproducible multi-node stack on a
@@ -25,7 +25,7 @@ environment and operational considerations, see [Operations](operations.md).
 - **Recommended for CI pipelines** (isolated environment, reproducible).
 - **Node control:** Supported (can restart nodes for chaos testing)
 
-**Run with:** `scripts/run-examples.sh -t 60 -v 1 -e 1 compose`
+**Run with:** `scripts/run/run-examples.sh -t 60 -v 1 -e 1 compose`
 
 ## Kubernetes runner
 - Deploys nodes onto a cluster for higher-fidelity, longer-running scenarios (via `K8sDeployer`).
@@ -34,7 +34,7 @@ environment and operational considerations, see [Operations](operations.md).
   and scheduling matter.
 - **Node control:** Not supported yet (chaos workloads not available)
 
-**Run with:** `scripts/run-examples.sh -t 60 -v 1 -e 1 k8s`
+**Run with:** `scripts/run/run-examples.sh -t 60 -v 1 -e 1 k8s`
 
 ### Common expectations
 - All runners require at least one validator and, for transaction scenarios,

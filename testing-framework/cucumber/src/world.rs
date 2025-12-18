@@ -232,7 +232,7 @@ impl TestingFrameworkWorld {
 
             if !(node_ok && exec_ok) {
                 return Err(StepError::Preflight {
-                    message: "Missing Nomos host binaries. Set NOMOS_NODE_BIN and NOMOS_EXECUTOR_BIN, or run `scripts/run-examples.sh host` to restore them into `testing-framework/assets/stack/bin`.".to_owned(),
+                    message: "Missing Nomos host binaries. Set NOMOS_NODE_BIN and NOMOS_EXECUTOR_BIN, or run `scripts/run/run-examples.sh host` to restore them into `testing-framework/assets/stack/bin`.".to_owned(),
                 });
             }
         }

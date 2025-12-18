@@ -6,7 +6,7 @@ if [ -z "${BASH_VERSION:-}" ]; then
 fi
 
 # shellcheck disable=SC1091
-. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../lib/common.sh"
 
 readonly DEFAULT_CIRCUITS_VERSION="v0.3.1"
 readonly DEFAULT_LINUX_PLATFORM="linux-x86_64"
@@ -18,7 +18,7 @@ readonly RAW_GITHUB_BASE_URL="https://raw.githubusercontent.com"
 
 setup_circuits_stack::usage() {
   cat <<'EOF'
-Usage: scripts/setup-circuits-stack.sh [VERSION]
+Usage: scripts/setup/setup-circuits-stack.sh [VERSION]
 
 Prepares circuits for both the Docker image (Linux/x86_64) and the host (for
 witness generators).
@@ -73,7 +73,7 @@ setup_circuits_stack::fetch_bundle() {
 
   NOMOS_CIRCUITS_PLATFORM="${platform}" \
   NOMOS_CIRCUITS_REBUILD_RAPIDSNARK="${rebuild}" \
-    "${ROOT_DIR}/scripts/setup-nomos-circuits.sh" "${VERSION}" "${dest}"
+    "${ROOT_DIR}/scripts/setup/setup-nomos-circuits.sh" "${VERSION}" "${dest}"
 }
 
 setup_circuits_stack::fetch_kzg_params() {
@@ -166,7 +166,7 @@ setup_circuits_stack::main() {
 
 Done.
 - For Docker/compose: rebuild the image to bake the Linux bundle:
-    scripts/build_test_image.sh
+    scripts/build/build_test_image.sh
 - For host runs (e.g., compose_runner): ensure NOMOS_CIRCUITS points to the host bundle above.
 EOF
 }

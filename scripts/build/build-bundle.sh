@@ -6,7 +6,7 @@ if [ -z "${BASH_VERSION:-}" ]; then
 fi
 
 # shellcheck disable=SC1091
-. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../lib/common.sh"
 
 readonly DOCKER_RUST_IMAGE="rust:1.80-bullseye"
 declare -ar DOCKER_APT_PACKAGES=(
@@ -25,7 +25,7 @@ declare -ar DOCKER_APT_PACKAGES=(
 
 build_bundle::usage() {
   cat <<'USAGE'
-Usage: scripts/build-bundle.sh [--platform host|linux] [--output PATH]
+Usage: scripts/build/build-bundle.sh [--platform host|linux] [--output PATH]
 
 Options:
   --platform        Target platform for binaries (default: host)
@@ -277,7 +277,7 @@ build_bundle::maybe_run_linux_build_in_docker() {
     "${extra_mounts[@]}" \
     -w /workspace \
     "${DOCKER_RUST_IMAGE}" \
-    bash -c "apt-get update && apt-get install -y ${DOCKER_APT_PACKAGES[*]} && ./scripts/build-bundle.sh --platform linux --output \"${container_output}\" ${src_args[*]} ${features_args[*]}"
+    bash -c "apt-get update && apt-get install -y ${DOCKER_APT_PACKAGES[*]} && ./scripts/build/build-bundle.sh --platform linux --output \"${container_output}\" ${src_args[*]} ${features_args[*]}"
 
   exit 0
 }
@@ -316,7 +316,7 @@ build_bundle::prepare_circuits() {
     echo "Circuits already present at ${CIRCUITS_DIR}; skipping download"
   else
     STACK_DIR="${CIRCUITS_DIR}" HOST_DIR="${CIRCUITS_DIR}" \
-      "${ROOT_DIR}/scripts/setup-circuits-stack.sh" "${VERSION}" </dev/null
+      "${ROOT_DIR}/scripts/setup/setup-circuits-stack.sh" "${VERSION}" </dev/null
   fi
 
   NODE_BIN="${NODE_TARGET}/debug/nomos-node"

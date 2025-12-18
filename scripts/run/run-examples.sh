@@ -6,7 +6,7 @@ if [ -z "${BASH_VERSION:-}" ]; then
 fi
 
 # shellcheck disable=SC1091
-. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../lib/common.sh"
 
 readonly DEFAULT_KZG_DIR_REL="testing-framework/assets/stack/kzgrs_test_params"
 readonly DEFAULT_KZG_FILE="kzgrs_test_params"
@@ -35,7 +35,7 @@ trap run_examples::cleanup EXIT
 
 run_examples::usage() {
   cat <<EOF
-Usage: scripts/run-examples.sh [options] [compose|host|k8s]
+Usage: scripts/run/run-examples.sh [options] [compose|host|k8s]
 
 Modes:
   compose   Run examples/src/bin/compose_runner.rs (default)
@@ -74,7 +74,7 @@ Environment:
 Notes:
   - For k8s runs on non-docker-desktop clusters (e.g. EKS), a locally built Docker image is not
     visible to the cluster. By default, this script skips local image rebuilds in that case.
-    If you need a custom image, run scripts/build_test_image.sh and push it to a registry the
+    If you need a custom image, run scripts/build/build_test_image.sh and push it to a registry the
     cluster can pull from, then set NOMOS_TESTNET_IMAGE accordingly.
 EOF
 }
@@ -424,7 +424,7 @@ run_examples::ensure_binaries_tar() {
   local platform="$1"
   local tar_path="$2"
   echo "==> Building fresh binaries bundle (${platform}) at ${tar_path}"
-  "${ROOT_DIR}/scripts/build-bundle.sh" --platform "${platform}" --output "${tar_path}" --rev "${NOMOS_NODE_REV}"
+  "${ROOT_DIR}/scripts/build/build-bundle.sh" --platform "${platform}" --output "${tar_path}" --rev "${NOMOS_NODE_REV}"
 }
 
 run_examples::prepare_bundles() {
@@ -480,7 +480,7 @@ run_examples::maybe_rebuild_image() {
 
   echo "==> Rebuilding testnet image (${IMAGE})"
   IMAGE_TAG="${IMAGE}" COMPOSE_CIRCUITS_PLATFORM="${COMPOSE_CIRCUITS_PLATFORM:-}" \
-    bash "${ROOT_DIR}/scripts/build_test_image.sh"
+    bash "${ROOT_DIR}/scripts/build/build_test_image.sh"
 }
 
 run_examples::maybe_restore_host_after_image() {

@@ -6,13 +6,13 @@ if [ -z "${BASH_VERSION:-}" ]; then
 fi
 
 # shellcheck disable=SC1091
-. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../lib/common.sh"
 
 build_linux_binaries::usage() {
   cat <<'EOF'
-Usage: scripts/build-linux-binaries.sh [options]
+Usage: scripts/build/build-linux-binaries.sh [options]
 
-Builds a Linux bundle via scripts/build-bundle.sh, then stages artifacts into:
+Builds a Linux bundle via scripts/build/build-bundle.sh, then stages artifacts into:
   - testing-framework/assets/stack/bin
   - testing-framework/assets/stack/kzgrs_test_params (or NOMOS_KZG_DIR_REL)
 
@@ -117,7 +117,7 @@ build_linux_binaries::build_bundle_if_needed() {
   fi
 
   echo "==> Building Linux bundle"
-  VERSION="${VERSION}" "${ROOT_DIR}/scripts/build-bundle.sh" "${BUILD_ARGS[@]}"
+  VERSION="${VERSION}" "${ROOT_DIR}/scripts/build/build-bundle.sh" "${BUILD_ARGS[@]}"
 
   BUNDLE_TAR="${OUTPUT_TAR}"
 }

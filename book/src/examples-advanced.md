@@ -2,6 +2,11 @@
 
 Realistic advanced scenarios demonstrating framework capabilities for production testing.
 
+**Adapt from Complete Source:**
+- [compose_runner.rs](https://github.com/logos-co/nomos-node/blob/master/testnet/testing-framework/runner-examples/src/bin/compose_runner.rs) — Compose examples with workloads
+- [k8s_runner.rs](https://github.com/logos-co/nomos-node/blob/master/testnet/testing-framework/runner-examples/src/bin/k8s_runner.rs) — K8s production patterns
+- [Chaos testing patterns](https://github.com/logos-co/nomos-node/blob/master/testnet/testing-framework/workflows/src/chaos.rs) — Node control implementation
+
 ## Summary
 
 | Example | Topology | Workloads | Deployer | Key Feature |

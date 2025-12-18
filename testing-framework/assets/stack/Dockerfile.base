@@ -38,8 +38,8 @@ RUN chmod +x \
       /workspace/testing-framework/assets/stack/scripts/docker/prepare_circuits.sh \
       /workspace/testing-framework/assets/stack/scripts/docker/prepare_binaries.sh \
       /workspace/testing-framework/assets/stack/scripts/docker/build_cfgsync.sh \
-      /workspace/scripts/build-rapidsnark.sh \
-      /workspace/scripts/setup-nomos-circuits.sh \
+      /workspace/scripts/build/build-rapidsnark.sh \
+      /workspace/scripts/setup/setup-nomos-circuits.sh \
     || true
 
 RUN /workspace/testing-framework/assets/stack/scripts/docker/prepare_circuits.sh
