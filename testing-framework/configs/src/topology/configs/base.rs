@@ -9,6 +9,8 @@ use super::{
 #[derive(Debug, Error)]
 pub enum BaseConfigError {
     #[error(transparent)]
+    Consensus(#[from] consensus::ConsensusConfigError),
+    #[error(transparent)]
     Da(#[from] da::DaConfigError),
     #[error(transparent)]
     Network(#[from] network::NetworkConfigError),
@@ -36,7 +38,7 @@ pub fn build_base_configs(
             ids,
             consensus_params,
             wallet_config,
-        ),
+        )?,
         bootstrap_configs: bootstrap::create_bootstrap_configs(
             ids,
             SHORT_PROLONGED_BOOTSTRAP_PERIOD,

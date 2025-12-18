@@ -29,6 +29,18 @@ use num_bigint::BigUint;
 
 use super::wallet::{WalletAccount, WalletConfig};
 
+#[derive(Debug, thiserror::Error)]
+pub enum ConsensusConfigError {
+    #[error("failed to build genesis inscription signer: {message}")]
+    InscriptionSigner { message: String },
+    #[error("failed to build genesis transaction: {message}")]
+    GenesisTx { message: String },
+    #[error("failed to build ledger config: {message}")]
+    LedgerConfig { message: String },
+    #[error("failed to sign genesis declarations: {message}")]
+    DeclarationSignature { message: String },
+}
+
 #[derive(Clone)]
 pub struct ConsensusParams {
     pub n_participants: usize,
@@ -43,23 +55,10 @@ impl ConsensusParams {
     #[must_use]
     pub fn default_for_participants(n_participants: usize) -> Self {
         let active_slot_coeff = env::var(Self::CONSENSUS_ACTIVE_SLOT_COEFF_VAR)
-            .map(|s| {
-                f64::from_str(&s).unwrap_or_else(|err| {
-                    panic!(
-                        "invalid {}='{}' (expected a float in (0.0, 1.0]): {err}",
-                        Self::CONSENSUS_ACTIVE_SLOT_COEFF_VAR,
-                        s
-                    )
-                })
-            })
+            .ok()
+            .and_then(|raw| f64::from_str(&raw).ok())
+            .filter(|value| (0.0..=1.0).contains(value) && *value > 0.0)
             .unwrap_or(Self::DEFAULT_ACTIVE_SLOT_COEFF);
-
-        assert!(
-            (0.0..=1.0).contains(&active_slot_coeff) && active_slot_coeff > 0.0,
-            "{} must be in (0.0, 1.0], got {}",
-            Self::CONSENSUS_ACTIVE_SLOT_COEFF_VAR,
-            active_slot_coeff
-        );
 
         Self {
             n_participants,
@@ -67,7 +66,7 @@ impl ConsensusParams {
             // (forks) being produced in the same slot (epoch). Setting the security
             // parameter to some value > 1 ensures nodes have some time to sync before
             // deciding on the longest chain.
-            security_param: NonZero::new(10).unwrap(),
+            security_param: unsafe { NonZero::new_unchecked(10) },
             // a block should be produced (on average) every slot
             active_slot_coeff,
         }
@@ -116,13 +115,17 @@ pub struct ServiceNote {
     pub output_index: usize,
 }
 
-fn create_genesis_tx(utxos: &[Utxo]) -> GenesisTx {
+fn create_genesis_tx(utxos: &[Utxo]) -> Result<GenesisTx, ConsensusConfigError> {
     // Create a genesis inscription op (similar to config.yaml)
     let inscription = InscriptionOp {
         channel_id: ChannelId::from([0; 32]),
         inscription: vec![103, 101, 110, 101, 115, 105, 115], // "genesis" in bytes
         parent: MsgId::root(),
-        signer: Ed25519PublicKey::from_bytes(&[0; 32]).unwrap(),
+        signer: Ed25519PublicKey::from_bytes(&[0; 32]).map_err(|err| {
+            ConsensusConfigError::InscriptionSigner {
+                message: err.to_string(),
+            }
+        })?,
     };
 
     // Create ledger transaction with the utxos as outputs
@@ -143,15 +146,19 @@ fn create_genesis_tx(utxos: &[Utxo]) -> GenesisTx {
     };
 
     // Wrap in GenesisTx
-    GenesisTx::from_tx(signed_mantle_tx).expect("Invalid genesis transaction")
+    GenesisTx::from_tx(signed_mantle_tx).map_err(|err| ConsensusConfigError::GenesisTx {
+        message: err.to_string(),
+    })
 }
 
-fn build_ledger_config(consensus_params: &ConsensusParams) -> nomos_ledger::Config {
-    nomos_ledger::Config {
+fn build_ledger_config(
+    consensus_params: &ConsensusParams,
+) -> Result<nomos_ledger::Config, ConsensusConfigError> {
+    Ok(nomos_ledger::Config {
         epoch_config: EpochConfig {
-            epoch_stake_distribution_stabilization: NonZero::new(3).unwrap(),
-            epoch_period_nonce_buffer: NonZero::new(3).unwrap(),
-            epoch_period_nonce_stabilization: NonZero::new(4).unwrap(),
+            epoch_stake_distribution_stabilization: unsafe { NonZero::new_unchecked(3) },
+            epoch_period_nonce_buffer: unsafe { NonZero::new_unchecked(3) },
+            epoch_period_nonce_stabilization: unsafe { NonZero::new_unchecked(4) },
         },
         consensus_config: cryptarchia_engine::Config {
             security_param: consensus_params.security_param,
@@ -189,14 +196,18 @@ fn build_ledger_config(consensus_params: &ConsensusParams) -> nomos_ledger::Conf
             },
             service_rewards_params: nomos_ledger::mantle::sdp::ServiceRewardsParameters {
                 blend: nomos_ledger::mantle::sdp::rewards::blend::RewardsParameters {
-                    rounds_per_session: NonZeroU64::new(10).unwrap(),
-                    message_frequency_per_round: NonNegativeF64::try_from(1.0).unwrap(),
-                    num_blend_layers: NonZeroU64::new(3).unwrap(),
-                    minimum_network_size: NonZeroU64::new(1).unwrap(),
+                    rounds_per_session: unsafe { NonZeroU64::new_unchecked(10) },
+                    message_frequency_per_round: NonNegativeF64::try_from(1.0).map_err(|_| {
+                        ConsensusConfigError::LedgerConfig {
+                            message: "message_frequency_per_round must be non-negative".to_owned(),
+                        }
+                    })?,
+                    num_blend_layers: unsafe { NonZeroU64::new_unchecked(3) },
+                    minimum_network_size: unsafe { NonZeroU64::new_unchecked(1) },
                 },
             },
         },
-    }
+    })
 }
 
 #[must_use]
@@ -204,7 +215,7 @@ pub fn create_consensus_configs(
     ids: &[[u8; 32]],
     consensus_params: &ConsensusParams,
     wallet: &WalletConfig,
-) -> Vec<GeneralConsensusConfig> {
+) -> Result<Vec<GeneralConsensusConfig>, ConsensusConfigError> {
     let mut leader_keys = Vec::new();
     let mut blend_notes = Vec::new();
     let mut da_notes = Vec::new();
@@ -216,10 +227,10 @@ pub fn create_consensus_configs(
         &mut da_notes,
     );
     let utxos = append_wallet_utxos(utxos, wallet);
-    let genesis_tx = create_genesis_tx(&utxos);
-    let ledger_config = build_ledger_config(consensus_params);
+    let genesis_tx = create_genesis_tx(&utxos)?;
+    let ledger_config = build_ledger_config(consensus_params)?;
 
-    leader_keys
+    Ok(leader_keys
         .into_iter()
         .map(|(pk, sk)| GeneralConsensusConfig {
             leader_config: LeaderConfig { pk, sk },
@@ -230,7 +241,7 @@ pub fn create_consensus_configs(
             blend_notes: blend_notes.clone(),
             wallet_accounts: wallet.accounts.clone(),
         })
-        .collect()
+        .collect())
 }
 
 fn create_utxos_for_leader_and_services(
@@ -324,12 +335,16 @@ fn append_wallet_utxos(mut utxos: Vec<Utxo>, wallet: &WalletConfig) -> Vec<Utxo>
 pub fn create_genesis_tx_with_declarations(
     ledger_tx: LedgerTx,
     providers: Vec<ProviderInfo>,
-) -> GenesisTx {
+) -> Result<GenesisTx, ConsensusConfigError> {
     let inscription = InscriptionOp {
         channel_id: ChannelId::from([0; 32]),
         inscription: vec![103, 101, 110, 101, 115, 105, 115], // "genesis" in bytes
         parent: MsgId::root(),
-        signer: Ed25519PublicKey::from_bytes(&[0; 32]).unwrap(),
+        signer: Ed25519PublicKey::from_bytes(&[0; 32]).map_err(|err| {
+            ConsensusConfigError::InscriptionSigner {
+                message: err.to_string(),
+            }
+        })?,
     };
 
     let ledger_tx_hash = ledger_tx.hash();
@@ -365,7 +380,9 @@ pub fn create_genesis_tx_with_declarations(
     for provider in providers {
         let zk_sig =
             ZkKey::multi_sign(&[provider.note.sk, provider.zk_sk], mantle_tx_hash.as_ref())
-                .unwrap();
+                .map_err(|err| ConsensusConfigError::DeclarationSignature {
+                    message: format!("{err:?}"),
+                })?;
         let ed25519_sig = provider
             .provider_sk
             .sign_payload(mantle_tx_hash.as_signing_bytes().as_ref());
@@ -382,5 +399,7 @@ pub fn create_genesis_tx_with_declarations(
         ledger_tx_proof: ZkSignature::new(CompressedGroth16Proof::from_bytes(&[0u8; 128])),
     };
 
-    GenesisTx::from_tx(signed_mantle_tx).expect("Invalid genesis transaction")
+    GenesisTx::from_tx(signed_mantle_tx).map_err(|err| ConsensusConfigError::GenesisTx {
+        message: err.to_string(),
+    })
 }

@@ -9,7 +9,7 @@ use testing_framework_config::topology::configs::{
     GeneralConfig,
     api::GeneralApiConfig,
     base::{BaseConfigError, BaseConfigs, build_base_configs},
-    consensus::{ConsensusParams, create_genesis_tx_with_declarations},
+    consensus::{ConsensusConfigError, ConsensusParams, create_genesis_tx_with_declarations},
     da::DaParams,
     network::NetworkParams,
     time::default_time_config,
@@ -60,6 +60,8 @@ pub enum NodeConfigBuildError {
     Providers(#[from] ProviderBuildError),
     #[error(transparent)]
     Base(#[from] BaseConfigError),
+    #[error(transparent)]
+    Genesis(#[from] ConsensusConfigError),
     #[error("failed to allocate an available UDP port")]
     PortAllocFailed,
     #[error("failed to parse multiaddr '{value}': {message}")]
@@ -143,7 +145,7 @@ pub fn try_create_node_configs(
         .get(0)
         .ok_or(NodeConfigBuildError::MissingConsensusConfig)?;
     let ledger_tx = first_consensus.genesis_tx.mantle_tx().ledger_tx.clone();
-    let genesis_tx = create_genesis_tx_with_declarations(ledger_tx, providers);
+    let genesis_tx = create_genesis_tx_with_declarations(ledger_tx, providers)?;
 
     for c in &mut consensus_configs {
         c.genesis_tx = genesis_tx.clone();

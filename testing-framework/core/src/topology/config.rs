@@ -309,9 +309,15 @@ impl TopologyBuilder {
             .mantle_tx()
             .ledger_tx
             .clone();
-        let genesis_tx = create_genesis_tx_with_declarations(ledger_tx, providers);
-        for c in &mut consensus_configs {
-            c.genesis_tx = genesis_tx.clone();
+        match create_genesis_tx_with_declarations(ledger_tx, providers) {
+            Ok(genesis_tx) => {
+                for c in &mut consensus_configs {
+                    c.genesis_tx = genesis_tx.clone();
+                }
+            }
+            Err(err) => {
+                tracing::error!(error = ?err, "failed to build genesis declarations; using base genesis transaction");
+            }
         }
 
         let kms_configs =
