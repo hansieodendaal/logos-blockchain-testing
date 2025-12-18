@@ -1,7 +1,9 @@
-use testing_framework_core::scenario::ScenarioBuilder;
+use testing_framework_core::scenario::{Scenario, ScenarioBuilder};
 use testing_framework_workflows::ScenarioBuilderExt;
 
-pub fn da_plan() -> testing_framework_core::scenario::Scenario<()> {
+use crate::SnippetResult;
+
+pub fn da_plan() -> SnippetResult<Scenario<()>> {
     ScenarioBuilder::topology_with(|t| t.network_star().validators(1).executors(1))
         .wallets(50)
         .da_with(|da| {

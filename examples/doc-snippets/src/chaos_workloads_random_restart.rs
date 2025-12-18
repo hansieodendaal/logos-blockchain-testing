@@ -1,11 +1,11 @@
 use std::time::Duration;
 
-use testing_framework_core::scenario::ScenarioBuilder;
+use testing_framework_core::scenario::{NodeControlCapability, Scenario, ScenarioBuilder};
 use testing_framework_workflows::{ScenarioBuilderExt, workloads::chaos::RandomRestartWorkload};
 
-pub fn random_restart_plan() -> testing_framework_core::scenario::Scenario<
-    testing_framework_core::scenario::NodeControlCapability,
-> {
+use crate::SnippetResult;
+
+pub fn random_restart_plan() -> SnippetResult<Scenario<NodeControlCapability>> {
     ScenarioBuilder::topology_with(|t| t.network_star().validators(2).executors(1))
         .enable_node_control()
         .with_workload(RandomRestartWorkload::new(

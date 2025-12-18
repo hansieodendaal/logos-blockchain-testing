@@ -4,6 +4,7 @@ use groth16::fr_to_bytes;
 use key_management_system_service::{backend::preload::PreloadKMSBackendSettings, keys::Key};
 use nomos_utils::net::get_available_udp_port;
 use rand::{Rng, thread_rng};
+use thiserror::Error;
 
 use crate::topology::configs::{
     blend::GeneralBlendConfig, da::GeneralDaConfig, wallet::WalletAccount,
@@ -52,40 +53,67 @@ pub fn create_kms_configs(
         .collect()
 }
 
-pub fn resolve_ids(ids: Option<Vec<[u8; 32]>>, count: usize) -> Vec<[u8; 32]> {
-    ids.map_or_else(
-        || {
+#[derive(Debug, Error)]
+pub enum TopologyResolveError {
+    #[error("expected {expected} ids but got {actual}")]
+    IdCountMismatch { expected: usize, actual: usize },
+    #[error("expected {expected} {label} ports but got {actual}")]
+    PortCountMismatch {
+        label: &'static str,
+        expected: usize,
+        actual: usize,
+    },
+    #[error("failed to allocate a free UDP port for {label}")]
+    PortAllocationFailed { label: &'static str },
+}
+
+pub fn resolve_ids(
+    ids: Option<Vec<[u8; 32]>>,
+    count: usize,
+) -> Result<Vec<[u8; 32]>, TopologyResolveError> {
+    match ids {
+        Some(ids) => {
+            if ids.len() != count {
+                return Err(TopologyResolveError::IdCountMismatch {
+                    expected: count,
+                    actual: ids.len(),
+                });
+            }
+            Ok(ids)
+        }
+        None => {
             let mut generated = vec![[0; 32]; count];
             for id in &mut generated {
                 thread_rng().fill(id);
             }
-            generated
-        },
-        |ids| {
-            assert_eq!(
-                ids.len(),
-                count,
-                "expected {count} ids but got {}",
-                ids.len()
-            );
-            ids
-        },
-    )
+            Ok(generated)
+        }
+    }
 }
 
-pub fn resolve_ports(ports: Option<Vec<u16>>, count: usize, label: &str) -> Vec<u16> {
-    let resolved = ports.unwrap_or_else(|| {
-        iter::repeat_with(|| get_available_udp_port().unwrap())
-            .take(count)
-            .collect()
-    });
-    assert_eq!(
-        resolved.len(),
-        count,
-        "expected {count} {label} ports but got {}",
-        resolved.len()
-    );
-    resolved
+pub fn resolve_ports(
+    ports: Option<Vec<u16>>,
+    count: usize,
+    label: &'static str,
+) -> Result<Vec<u16>, TopologyResolveError> {
+    let resolved = match ports {
+        Some(ports) => ports,
+        None => iter::repeat_with(|| {
+            get_available_udp_port().ok_or(TopologyResolveError::PortAllocationFailed { label })
+        })
+        .take(count)
+        .collect::<Result<Vec<_>, _>>()?,
+    };
+
+    if resolved.len() != count {
+        return Err(TopologyResolveError::PortCountMismatch {
+            label,
+            expected: count,
+            actual: resolved.len(),
+        });
+    }
+
+    Ok(resolved)
 }
 
 pub fn multiaddr_port(addr: &nomos_libp2p::Multiaddr) -> Option<u16> {

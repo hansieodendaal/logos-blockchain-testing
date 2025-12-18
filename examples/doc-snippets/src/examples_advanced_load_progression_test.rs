@@ -15,7 +15,7 @@ pub async fn load_progression_test() -> Result<()> {
                 .transactions_with(|txs| txs.rate(rate).users(20))
                 .expect_consensus_liveness()
                 .with_run_duration(Duration::from_secs(60))
-                .build();
+                .build()?;
 
         let deployer = ComposeDeployer::default();
         let runner = deployer.deploy(&plan).await?;

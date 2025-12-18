@@ -1,5 +1,6 @@
 use std::{num::NonZeroUsize, sync::Arc, time::Duration};
 
+use thiserror::Error;
 use tracing::{debug, info};
 
 use super::{
@@ -7,7 +8,7 @@ use super::{
     workload::Workload,
 };
 use crate::topology::{
-    config::{TopologyBuilder, TopologyConfig},
+    config::{TopologyBuildError, TopologyBuilder, TopologyConfig},
     configs::{network::Libp2pNetworkLayout, wallet::WalletConfig},
     generation::GeneratedTopology,
 };
@@ -15,6 +16,12 @@ use crate::topology::{
 const DEFAULT_FUNDS_PER_WALLET: u64 = 100;
 const MIN_EXPECTATION_BLOCKS: u32 = 2;
 const MIN_EXPECTATION_FALLBACK_SECS: u64 = 10;
+
+#[derive(Debug, Error)]
+pub enum ScenarioBuildError {
+    #[error(transparent)]
+    Topology(#[from] TopologyBuildError),
+}
 
 /// Immutable scenario definition shared between the runner, workloads, and
 /// expectations.
@@ -214,7 +221,7 @@ impl<Caps> Builder<Caps> {
     #[must_use]
     /// Finalize the scenario, computing run metrics and initializing
     /// components.
-    pub fn build(self) -> Scenario<Caps> {
+    pub fn build(self) -> Result<Scenario<Caps>, ScenarioBuildError> {
         let Self {
             topology,
             mut workloads,
@@ -224,7 +231,7 @@ impl<Caps> Builder<Caps> {
             ..
         } = self;
 
-        let generated = topology.build();
+        let generated = topology.build()?;
         let duration = enforce_min_duration(&generated, duration);
         let run_metrics = RunMetrics::from_topology(&generated, duration);
         initialize_components(&generated, &run_metrics, &mut workloads, &mut expectations);
@@ -238,7 +245,13 @@ impl<Caps> Builder<Caps> {
             "scenario built"
         );
 
-        Scenario::new(generated, workloads, expectations, duration, capabilities)
+        Ok(Scenario::new(
+            generated,
+            workloads,
+            expectations,
+            duration,
+            capabilities,
+        ))
     }
 }
 

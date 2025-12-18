@@ -3,7 +3,10 @@ use std::time::Duration;
 use testing_framework_core::scenario::{NodeControlCapability, ScenarioBuilder};
 use testing_framework_workflows::{ChaosBuilderExt, ScenarioBuilderExt};
 
-pub fn chaos_plan() -> testing_framework_core::scenario::Scenario<NodeControlCapability> {
+use crate::SnippetResult;
+
+pub fn chaos_plan()
+-> SnippetResult<testing_framework_core::scenario::Scenario<NodeControlCapability>> {
     ScenarioBuilder::topology_with(|t| t.network_star().validators(3).executors(2))
         .enable_node_control() // Enable node control capability
         .chaos_with(|c| {

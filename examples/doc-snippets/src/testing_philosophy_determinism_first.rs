@@ -3,14 +3,16 @@ use std::time::Duration;
 use testing_framework_core::scenario::ScenarioBuilder;
 use testing_framework_workflows::{ChaosBuilderExt, ScenarioBuilderExt};
 
-pub fn determinism_first() {
+use crate::SnippetResult;
+
+pub fn determinism_first() -> SnippetResult<()> {
     // Separate: functional test (deterministic)
     let _plan = ScenarioBuilder::topology_with(|t| t.network_star().validators(2).executors(1))
         .transactions_with(|txs| {
             txs.rate(5) // 5 transactions per block
         })
         .expect_consensus_liveness()
-        .build();
+        .build()?;
 
     // Separate: chaos test (introduces randomness)
     let _chaos_plan =
@@ -27,5 +29,6 @@ pub fn determinism_first() {
                 txs.rate(5) // 5 transactions per block
             })
             .expect_consensus_liveness()
-            .build();
+            .build()?;
+    Ok(())
 }

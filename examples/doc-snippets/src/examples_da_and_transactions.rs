@@ -12,7 +12,7 @@ pub async fn da_and_transactions() -> Result<()> {
         .da_with(|da| da.channel_rate(2).blob_rate(2))
         .expect_consensus_liveness()
         .with_run_duration(Duration::from_secs(90))
-        .build();
+        .build()?;
 
     let deployer = LocalDeployer::default();
     let runner = deployer.deploy(&plan).await?;

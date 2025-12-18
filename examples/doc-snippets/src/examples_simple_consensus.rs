@@ -9,7 +9,7 @@ pub async fn simple_consensus() -> Result<()> {
     let mut plan = ScenarioBuilder::topology_with(|t| t.network_star().validators(3).executors(0))
         .expect_consensus_liveness()
         .with_run_duration(Duration::from_secs(30))
-        .build();
+        .build()?;
 
     let deployer = LocalDeployer::default();
     let runner = deployer.deploy(&plan).await?;

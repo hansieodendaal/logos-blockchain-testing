@@ -61,7 +61,7 @@ async fn run_local_case(validators: usize, executors: usize, run_duration: Durat
             .expect_consensus_liveness()
     };
 
-    let mut plan = scenario.build();
+    let mut plan = scenario.build()?;
 
     let deployer = LocalDeployer::default().with_membership_check(true);
     info!("deploying local nodes");

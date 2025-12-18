@@ -12,7 +12,7 @@ pub async fn sustained_load_test() -> Result<()> {
         .da_with(|da| da.channel_rate(2).blob_rate(3))
         .expect_consensus_liveness()
         .with_run_duration(Duration::from_secs(300))
-        .build();
+        .build()?;
 
     let deployer = ComposeDeployer::default();
     let runner = deployer.deploy(&plan).await?;

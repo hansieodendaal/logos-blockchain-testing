@@ -1,5 +1,7 @@
 use testing_framework_core::scenario::ScenarioBuilder;
 
+use crate::SnippetResult;
+
 pub trait YourExpectationDslExt: Sized {
     fn expect_your_condition(self) -> Self;
 }
@@ -10,8 +12,9 @@ impl<Caps> YourExpectationDslExt for testing_framework_core::scenario::Builder<C
     }
 }
 
-pub fn use_in_examples() {
+pub fn use_in_examples() -> SnippetResult<()> {
     let _plan = ScenarioBuilder::topology_with(|t| t.network_star().validators(3).executors(0))
         .expect_your_condition()
-        .build();
+        .build()?;
+    Ok(())
 }

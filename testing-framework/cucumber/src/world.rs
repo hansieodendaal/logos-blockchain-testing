@@ -1,7 +1,9 @@
 use std::{env, path::PathBuf, time::Duration};
 
 use cucumber::World;
-use testing_framework_core::scenario::{Builder, NodeControlCapability, Scenario, ScenarioBuilder};
+use testing_framework_core::scenario::{
+    Builder, NodeControlCapability, Scenario, ScenarioBuildError, ScenarioBuilder,
+};
 use testing_framework_workflows::{ScenarioBuilderExt as _, expectations::ConsensusLiveness};
 use thiserror::Error;
 
@@ -81,6 +83,11 @@ pub enum StepError {
     InvalidArgument { message: String },
     #[error("{message}")]
     Preflight { message: String },
+    #[error("failed to build scenario: {source}")]
+    ScenarioBuild {
+        #[source]
+        source: ScenarioBuildError,
+    },
     #[error("{message}")]
     RunFailed { message: String },
 }
@@ -195,14 +202,18 @@ impl TestingFrameworkWorld {
     pub fn build_local_scenario(&self) -> Result<Scenario<()>, StepError> {
         self.preflight(DeployerKind::Local)?;
         let builder = self.make_builder_for_deployer::<()>(DeployerKind::Local)?;
-        Ok(builder.build())
+        builder
+            .build()
+            .map_err(|source| StepError::ScenarioBuild { source })
     }
 
     pub fn build_compose_scenario(&self) -> Result<Scenario<NodeControlCapability>, StepError> {
         self.preflight(DeployerKind::Compose)?;
         let builder =
             self.make_builder_for_deployer::<NodeControlCapability>(DeployerKind::Compose)?;
-        Ok(builder.build())
+        builder
+            .build()
+            .map_err(|source| StepError::ScenarioBuild { source })
     }
 
     pub fn preflight(&self, expected: DeployerKind) -> Result<(), StepError> {

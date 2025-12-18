@@ -10,7 +10,7 @@ use crate::{
         validator::{Validator, create_validator_config},
     },
     topology::{
-        config::{TopologyBuilder, TopologyConfig},
+        config::{TopologyBuildError, TopologyBuilder, TopologyConfig},
         configs::GeneralConfig,
         generation::find_expected_peer_counts,
         readiness::{
@@ -32,12 +32,14 @@ pub type DeployedNodes = (Vec<Validator>, Vec<Executor>);
 #[derive(Debug, Error)]
 pub enum SpawnTopologyError {
     #[error(transparent)]
+    Build(#[from] TopologyBuildError),
+    #[error(transparent)]
     Node(#[from] SpawnNodeError),
 }
 
 impl Topology {
     pub async fn spawn(config: TopologyConfig) -> Result<Self, SpawnTopologyError> {
-        let generated = TopologyBuilder::new(config.clone()).build();
+        let generated = TopologyBuilder::new(config.clone()).build()?;
         let n_validators = config.n_validators;
         let n_executors = config.n_executors;
         let node_configs = generated
@@ -64,7 +66,7 @@ impl Topology {
             .with_ids(ids.to_vec())
             .with_da_ports(da_ports.to_vec())
             .with_blend_ports(blend_ports.to_vec())
-            .build();
+            .build()?;
 
         let node_configs = generated
             .nodes()

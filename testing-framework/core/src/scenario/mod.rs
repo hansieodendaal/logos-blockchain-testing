@@ -14,7 +14,9 @@ pub type DynError = Box<dyn std::error::Error + Send + Sync + 'static>;
 pub use capabilities::{
     NodeControlCapability, NodeControlHandle, ObservabilityCapability, RequiresNodeControl,
 };
-pub use definition::{Builder, Scenario, ScenarioBuilder, TopologyConfigurator};
+pub use definition::{
+    Builder, Scenario, ScenarioBuildError, ScenarioBuilder, TopologyConfigurator,
+};
 pub use expectation::Expectation;
 pub use observability::{ObservabilityCapabilityProvider, ObservabilityInputs};
 pub use runtime::{

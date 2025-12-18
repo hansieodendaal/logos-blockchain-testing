@@ -19,7 +19,7 @@ pub async fn aggressive_chaos_test() -> Result<()> {
         })
         .expect_consensus_liveness()
         .with_run_duration(Duration::from_secs(180))
-        .build();
+        .build()?;
 
     let deployer = ComposeDeployer::default();
     let runner = deployer.deploy(&plan).await?;

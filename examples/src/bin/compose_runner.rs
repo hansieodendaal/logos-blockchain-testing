@@ -82,7 +82,7 @@ async fn run_compose_case(
         .da_with(|da| da.channel_rate(DA_CHANNEL_RATE).blob_rate(DA_BLOB_RATE))
         .with_run_duration(run_duration)
         .expect_consensus_liveness()
-        .build();
+        .build()?;
 
     let deployer = ComposeDeployer::new();
     info!("deploying compose stack");

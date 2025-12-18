@@ -11,7 +11,7 @@ pub async fn transaction_workload() -> Result<()> {
         .transactions_with(|txs| txs.rate(5).users(10))
         .expect_consensus_liveness()
         .with_run_duration(Duration::from_secs(60))
-        .build();
+        .build()?;
 
     let deployer = LocalDeployer::default();
     let runner = deployer.deploy(&plan).await?;

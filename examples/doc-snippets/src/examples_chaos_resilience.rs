@@ -19,7 +19,7 @@ pub async fn chaos_resilience() -> Result<()> {
         })
         .expect_consensus_liveness()
         .with_run_duration(Duration::from_secs(120))
-        .build();
+        .build()?;
 
     let deployer = ComposeDeployer::default();
     let runner = deployer.deploy(&plan).await?;

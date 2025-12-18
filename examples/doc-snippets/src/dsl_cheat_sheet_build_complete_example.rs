@@ -19,7 +19,7 @@ pub async fn run_test() -> Result<()> {
         })
         .expect_consensus_liveness()
         .with_run_duration(Duration::from_secs(90))
-        .build();
+        .build()?;
 
     let deployer = LocalDeployer::default();
     let runner = deployer.deploy(&plan).await?;

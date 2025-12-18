@@ -109,7 +109,9 @@ mod tests {
 
     #[test]
     fn cfgsync_prebuilt_configs_preserve_genesis() {
-        let scenario = ScenarioBuilder::topology_with(|t| t.validators(1).executors(1)).build();
+        let scenario = ScenarioBuilder::topology_with(|t| t.validators(1).executors(1))
+            .build()
+            .expect("scenario build should succeed");
         let topology = scenario.topology().clone();
         let hosts = hosts_from_topology(&topology);
         let tracing_settings = tracing_settings(&topology);
@@ -161,7 +163,9 @@ mod tests {
 
     #[test]
     fn cfgsync_genesis_proofs_verify_against_ledger() {
-        let scenario = ScenarioBuilder::topology_with(|t| t.validators(1).executors(1)).build();
+        let scenario = ScenarioBuilder::topology_with(|t| t.validators(1).executors(1))
+            .build()
+            .expect("scenario build should succeed");
         let topology = scenario.topology().clone();
         let hosts = hosts_from_topology(&topology);
         let tracing_settings = tracing_settings(&topology);
@@ -197,7 +201,9 @@ mod tests {
 
     #[test]
     fn cfgsync_docker_overrides_produce_valid_genesis() {
-        let scenario = ScenarioBuilder::topology_with(|t| t.validators(1).executors(1)).build();
+        let scenario = ScenarioBuilder::topology_with(|t| t.validators(1).executors(1))
+            .build()
+            .expect("scenario build should succeed");
         let topology = scenario.topology().clone();
         let tracing_settings = tracing_settings(&topology);
         let hosts = docker_style_hosts(&topology);
@@ -228,7 +234,9 @@ mod tests {
 
     #[test]
     fn cfgsync_configs_match_topology_ports_and_genesis() {
-        let scenario = ScenarioBuilder::topology_with(|t| t.validators(1).executors(1)).build();
+        let scenario = ScenarioBuilder::topology_with(|t| t.validators(1).executors(1))
+            .build()
+            .expect("scenario build should succeed");
         let topology = scenario.topology().clone();
         let hosts = hosts_from_topology(&topology);
         let tracing_settings = tracing_settings(&topology);

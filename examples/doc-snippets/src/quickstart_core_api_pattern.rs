@@ -20,7 +20,7 @@ pub async fn run_local_demo() -> Result<()> {
         })
         .expect_consensus_liveness()
         .with_run_duration(Duration::from_secs(60))
-        .build();
+        .build()?;
 
     // Deploy and run
     let deployer = LocalDeployer::default();

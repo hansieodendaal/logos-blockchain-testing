@@ -59,7 +59,7 @@ async fn run_k8s_case(validators: usize, executors: usize, run_duration: Duratio
         }
     }
 
-    let mut plan = scenario.build();
+    let mut plan = scenario.build()?;
 
     let deployer = K8sDeployer::new();
     info!("deploying k8s stack");

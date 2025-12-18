@@ -1,5 +1,7 @@
 use testing_framework_core::scenario::ScenarioBuilder;
 
+use crate::SnippetResult;
+
 pub struct YourWorkloadBuilder;
 
 impl YourWorkloadBuilder {
@@ -24,8 +26,9 @@ impl<Caps> YourWorkloadDslExt for testing_framework_core::scenario::Builder<Caps
     }
 }
 
-pub fn use_in_examples() {
+pub fn use_in_examples() -> SnippetResult<()> {
     let _plan = ScenarioBuilder::topology_with(|t| t.network_star().validators(3).executors(0))
         .your_workload_with(|w| w.some_config())
-        .build();
+        .build()?;
+    Ok(())
 }

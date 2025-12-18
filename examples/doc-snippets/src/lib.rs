@@ -1,5 +1,7 @@
 #![allow(dead_code, unused_imports, unused_variables)]
 
+pub type SnippetResult<T> = Result<T, testing_framework_core::scenario::ScenarioBuildError>;
+
 mod architecture_overview_builder_api;
 mod chaos_workloads_random_restart;
 mod custom_workload_example_expectation;
