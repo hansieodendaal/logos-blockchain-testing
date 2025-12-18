@@ -1,6 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
-    env,
+    env, io,
     path::{Path, PathBuf},
     process,
     str::FromStr as _,
@@ -164,15 +164,6 @@ pub struct GeneralDaConfig {
     pub secret_zk_key: ZkKey,
 }
 
-#[must_use]
-pub fn create_da_configs(
-    ids: &[[u8; 32]],
-    da_params: &DaParams,
-    ports: &[u16],
-) -> Vec<GeneralDaConfig> {
-    try_create_da_configs(ids, da_params, ports).expect("failed to build DA configs")
-}
-
 #[derive(Debug, Error)]
 pub enum DaConfigError {
     #[error("DA ports length mismatch (ids={ids}, ports={ports})")]
@@ -184,6 +175,18 @@ pub enum DaConfigError {
         effective_subnetwork_size: usize,
         max: usize,
     },
+    #[error("failed to derive node key from bytes: {message}")]
+    NodeKeyFromBytes { message: String },
+    #[error("failed to create DA listening address for port {port}: {message}")]
+    ListeningAddress { port: u16, message: String },
+    #[error("failed to create blob storage directory at {path}: {source}")]
+    BlobStorageCreate {
+        path: PathBuf,
+        #[source]
+        source: io::Error,
+    },
+    #[error("failed to generate verifier secret key: {message}")]
+    VerifierKeyGen { message: String },
 }
 
 pub fn try_create_da_configs(
@@ -207,22 +210,28 @@ pub fn try_create_da_configs(
             ports: ports.len(),
         });
     }
-    let mut node_keys = vec![];
-    let mut peer_ids = vec![];
-    let mut listening_addresses = vec![];
+    let mut node_keys = Vec::with_capacity(ids.len());
+    let mut peer_ids = Vec::with_capacity(ids.len());
+    let mut listening_addresses = Vec::with_capacity(ids.len());
 
-    for (i, id) in ids.iter().enumerate() {
+    for (index, id) in ids.iter().enumerate() {
         let mut node_key_bytes = *id;
-        let node_key = ed25519::SecretKey::try_from_bytes(&mut node_key_bytes)
-            .expect("Failed to generate secret key from bytes");
+        let node_key = ed25519::SecretKey::try_from_bytes(&mut node_key_bytes).map_err(|err| {
+            DaConfigError::NodeKeyFromBytes {
+                message: err.to_string(),
+            }
+        })?;
         node_keys.push(node_key.clone());
 
         let peer_id = secret_key_to_peer_id(node_key);
         peer_ids.push(peer_id);
 
-        let listening_address =
-            Multiaddr::from_str(&format!("/ip4/127.0.0.1/udp/{}/quic-v1", ports[i],))
-                .expect("Failed to create multiaddr");
+        let port = ports[index];
+        let listening_address = Multiaddr::from_str(&format!("/ip4/127.0.0.1/udp/{port}/quic-v1",))
+            .map_err(|err| DaConfigError::ListeningAddress {
+                port,
+                message: err.to_string(),
+            })?;
         listening_addresses.push(listening_address);
     }
 
@@ -257,54 +266,61 @@ pub fn try_create_da_configs(
         template.init(SessionNumber::default(), assignations)
     };
 
-    Ok(ids
-        .iter()
-        .zip(node_keys)
-        .enumerate()
-        .map(|(i, (id, node_key))| {
-            let blob_storage_directory = env::temp_dir().join(format!(
-                "nomos-da-blob-{}-{i}-{}",
-                process::id(),
-                random::<u64>()
-            ));
-            let _ = std::fs::create_dir_all(&blob_storage_directory);
-            let verifier_sk = blst::min_sig::SecretKey::key_gen(id, &[]).unwrap();
-            let verifier_sk_bytes = verifier_sk.to_bytes();
-            let peer_id = peer_ids[i];
-            let signer = Ed25519Key::from_bytes(id);
-            let subnetwork_ids = membership.membership(&peer_id);
+    let mut configs = Vec::with_capacity(ids.len());
 
-            // We need unique ZK secret keys, so we just derive them deterministically from
-            // the generated Ed25519 public keys, which are guaranteed to be unique because
-            // they are in turned derived from node ID.
-            let secret_zk_key = ZkKey::from(BigUint::from_bytes_le(signer.public_key().as_bytes()));
-
-            GeneralDaConfig {
-                node_key,
-                signer,
-                peer_id,
-                secret_zk_key,
-                membership: membership.clone(),
-                listening_address: listening_addresses[i].clone(),
-                blob_storage_directory,
-                global_params_path: da_params.global_params_path.clone(),
-                verifier_sk: hex::encode(verifier_sk_bytes),
-                verifier_index: subnetwork_ids,
-                num_samples: da_params.num_samples,
-                num_subnets: da_params.num_subnets,
-                old_blobs_check_interval: da_params.old_blobs_check_interval,
-                blobs_validity_duration: da_params.blobs_validity_duration,
-                policy_settings: da_params.policy_settings.clone(),
-                monitor_settings: da_params.monitor_settings.clone(),
-                balancer_interval: da_params.balancer_interval,
-                redial_cooldown: da_params.redial_cooldown,
-                replication_settings: da_params.replication_settings,
-                subnets_refresh_interval: da_params.subnets_refresh_interval,
-                retry_shares_limit: da_params.retry_shares_limit,
-                retry_commitments_limit: da_params.retry_commitments_limit,
+    for ((index, id), node_key) in ids.iter().enumerate().zip(node_keys.into_iter()) {
+        let blob_storage_directory = env::temp_dir().join(format!(
+            "nomos-da-blob-{}-{index}-{}",
+            process::id(),
+            random::<u64>()
+        ));
+        std::fs::create_dir_all(&blob_storage_directory).map_err(|source| {
+            DaConfigError::BlobStorageCreate {
+                path: blob_storage_directory.clone(),
+                source,
             }
-        })
-        .collect())
+        })?;
+
+        let verifier_sk = blst::min_sig::SecretKey::key_gen(id, &[]).map_err(|err| {
+            DaConfigError::VerifierKeyGen {
+                message: format!("{err:?}"),
+            }
+        })?;
+        let verifier_sk_bytes = verifier_sk.to_bytes();
+
+        let peer_id = peer_ids[index];
+        let signer = Ed25519Key::from_bytes(id);
+        let subnetwork_ids = membership.membership(&peer_id);
+
+        let secret_zk_key = ZkKey::from(BigUint::from_bytes_le(signer.public_key().as_bytes()));
+
+        configs.push(GeneralDaConfig {
+            node_key,
+            signer,
+            peer_id,
+            secret_zk_key,
+            membership: membership.clone(),
+            listening_address: listening_addresses[index].clone(),
+            blob_storage_directory,
+            global_params_path: da_params.global_params_path.clone(),
+            verifier_sk: hex::encode(verifier_sk_bytes),
+            verifier_index: subnetwork_ids,
+            num_samples: da_params.num_samples,
+            num_subnets: da_params.num_subnets,
+            old_blobs_check_interval: da_params.old_blobs_check_interval,
+            blobs_validity_duration: da_params.blobs_validity_duration,
+            policy_settings: da_params.policy_settings.clone(),
+            monitor_settings: da_params.monitor_settings.clone(),
+            balancer_interval: da_params.balancer_interval,
+            redial_cooldown: da_params.redial_cooldown,
+            replication_settings: da_params.replication_settings,
+            subnets_refresh_interval: da_params.subnets_refresh_interval,
+            retry_shares_limit: da_params.retry_shares_limit,
+            retry_commitments_limit: da_params.retry_commitments_limit,
+        });
+    }
+
+    Ok(configs)
 }
 
 #[cfg(test)]
