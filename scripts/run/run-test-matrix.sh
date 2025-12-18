@@ -23,6 +23,7 @@ Options:
   --no-clean              Skip scripts/ops/clean.sh step
   --no-bundles            Skip scripts/build/build-bundle.sh (uses existing .tmp tarballs)
   --no-image-build        Skip image-build variants (compose/k8s); only run the --no-image-build cases
+  --allow-nonzero-progress  Treat expectation failures as success if logs show non-zero progress (for faster local iteration)
   --force-k8s-image-build Allow the k8s "rebuild image" run even on non-docker-desktop clusters
   --metrics-query-url URL       Forwarded to scripts/run/run-examples.sh (optional)
   --metrics-otlp-ingest-url URL Forwarded to scripts/run/run-examples.sh (optional)
@@ -31,6 +32,7 @@ Options:
 Notes:
   - For k8s on non-docker-desktop clusters, the matrix defaults to only the
     --no-image-build variant, since a local docker build is not visible to the cluster.
+  - --allow-nonzero-progress is intentionally lax and should not be used in CI.
 USAGE
 }
 
@@ -49,6 +51,7 @@ matrix::parse_args() {
   DO_CLEAN=1
   DO_BUNDLES=1
   SKIP_IMAGE_BUILD_VARIANTS=0
+  ALLOW_NONZERO_PROGRESS=0
   FORCE_K8S_IMAGE_BUILD=0
   METRICS_QUERY_URL=""
   METRICS_OTLP_INGEST_URL=""
@@ -67,6 +70,7 @@ matrix::parse_args() {
       --no-clean) DO_CLEAN=0; shift ;;
       --no-bundles) DO_BUNDLES=0; shift ;;
       --no-image-build) SKIP_IMAGE_BUILD_VARIANTS=1; shift ;;
+      --allow-nonzero-progress) ALLOW_NONZERO_PROGRESS=1; shift ;;
       --force-k8s-image-build) FORCE_K8S_IMAGE_BUILD=1; shift ;;
       --metrics-query-url) METRICS_QUERY_URL="${2:-}"; shift 2 ;;
       --metrics-query-url=*) METRICS_QUERY_URL="${1#*=}"; shift ;;
@@ -106,6 +110,16 @@ matrix::forwarded_args() {
   printf '%s\0' "${args[@]}"
 }
 
+matrix::log_has_nonzero_progress() {
+  local log="$1"
+  awk '
+    match($0, /height[^0-9]*([0-9]+)/, m) {
+      if (m[1] + 0 > 0) { ok = 1 }
+    }
+    END { exit ok ? 0 : 1 }
+  ' "${log}"
+}
+
 matrix::run_case() {
   local name="$1"
   shift
@@ -121,6 +135,13 @@ matrix::run_case() {
   "$@" 2>&1 | tee "${log}"
   status="${PIPESTATUS[0]}"
   set -e
+
+  if [ "${status}" -ne 0 ] && [ "${ALLOW_NONZERO_PROGRESS}" -eq 1 ]; then
+    if matrix::log_has_nonzero_progress "${log}"; then
+      echo "==> [${name}] Soft-passing due to non-zero progress (--allow-nonzero-progress)"
+      status=0
+    fi
+  fi
   end="$(date +%s)"
 
   CASE_NAMES+=("${name}")
