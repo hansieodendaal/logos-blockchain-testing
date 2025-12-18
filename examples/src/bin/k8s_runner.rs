@@ -1,6 +1,6 @@
 use std::{env, process, time::Duration};
 
-use anyhow::{Context as _, Result, ensure};
+use anyhow::{Context as _, Result};
 use runner_examples::{ScenarioBuilderExt as _, read_env_any};
 use testing_framework_core::scenario::{
     Deployer as _, ObservabilityCapability, Runner, ScenarioBuilder,
@@ -16,7 +16,6 @@ const MIXED_TXS_PER_BLOCK: u64 = 2;
 const TOTAL_WALLETS: usize = 200;
 const TRANSACTION_WALLETS: usize = 50;
 const DA_BLOB_RATE: u64 = 1;
-const MIN_CONSENSUS_HEIGHT: u64 = 5;
 
 #[tokio::main]
 async fn main() {
@@ -57,7 +56,8 @@ async fn run_k8s_case(validators: usize, executors: usize, run_duration: Duratio
     .wallets(TOTAL_WALLETS)
     .transactions_with(|txs| txs.rate(MIXED_TXS_PER_BLOCK).users(TRANSACTION_WALLETS))
     .da_with(|da| da.blob_rate(DA_BLOB_RATE).headroom_percent(0))
-    .with_run_duration(run_duration);
+    .with_run_duration(run_duration)
+    .expect_consensus_liveness();
 
     if let Ok(url) = env::var("K8S_RUNNER_METRICS_QUERY_URL")
         .or_else(|_| env::var("NOMOS_METRICS_QUERY_URL"))
@@ -107,30 +107,11 @@ async fn run_k8s_case(validators: usize, executors: usize, run_duration: Duratio
         warn!("metrics querying is disabled; set NOMOS_METRICS_QUERY_URL to enable PromQL queries");
     }
 
-    let validator_clients = runner.context().node_clients().validator_clients().to_vec();
-
     info!("running scenario");
-    // Keep the handle alive until after we query consensus info, so port-forwards
-    // and services stay up while we inspect nodes.
-    let handle = runner
+    runner
         .run(&mut plan)
         .await
         .context("running k8s scenario failed")?;
-
-    for (idx, client) in validator_clients.iter().enumerate() {
-        let info = client
-            .consensus_info()
-            .await
-            .with_context(|| format!("validator {idx} consensus_info failed"))?;
-        ensure!(
-            info.height >= MIN_CONSENSUS_HEIGHT,
-            "validator {idx} height {} should reach at least {MIN_CONSENSUS_HEIGHT} blocks",
-            info.height
-        );
-    }
-
-    // Explicitly drop after checks, allowing cleanup to proceed.
-    drop(handle);
 
     Ok(())
 }
