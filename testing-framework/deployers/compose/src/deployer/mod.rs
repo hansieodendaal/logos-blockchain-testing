@@ -101,8 +101,9 @@ mod tests {
     use nomos_tracing_service::TracingSettings;
     use testing_framework_core::{
         scenario::ScenarioBuilder,
-        topology::generation::{
-            GeneratedNodeConfig, GeneratedTopology, NodeRole as TopologyNodeRole,
+        topology::{
+            generation::{GeneratedNodeConfig, GeneratedTopology, NodeRole as TopologyNodeRole},
+            utils::multiaddr_port,
         },
     };
 
@@ -222,6 +223,70 @@ mod tests {
             .unwrap_or_else(|err| {
                 panic!("ledger rejected genesis for {}: {err:?}", host.identifier)
             });
+        }
+    }
+
+    #[test]
+    fn cfgsync_configs_match_topology_ports_and_genesis() {
+        let scenario = ScenarioBuilder::topology_with(|t| t.validators(1).executors(1)).build();
+        let topology = scenario.topology().clone();
+        let hosts = hosts_from_topology(&topology);
+        let tracing_settings = tracing_settings(&topology);
+
+        let configs = create_node_configs(
+            &topology.config().consensus_params,
+            &topology.config().da_params,
+            &tracing_settings,
+            &topology.config().wallet_config,
+            Some(topology.nodes().map(|node| node.id).collect()),
+            Some(topology.nodes().map(|node| node.da_port).collect()),
+            Some(topology.nodes().map(|node| node.blend_port).collect()),
+            hosts,
+        );
+        let configs_by_identifier: HashMap<_, _> = configs
+            .into_iter()
+            .map(|(host, config)| (host.identifier, config))
+            .collect();
+
+        for node in topology.nodes() {
+            let identifier = identifier_for(node.role(), node.index());
+            let cfg = configs_by_identifier
+                .get(&identifier)
+                .unwrap_or_else(|| panic!("missing cfgsync config for {identifier}"));
+
+            assert_eq!(
+                declaration_fingerprint(&node.general.consensus_config.genesis_tx),
+                declaration_fingerprint(&cfg.consensus_config.genesis_tx),
+                "genesis declaration mismatch for {identifier}"
+            );
+
+            let expected_net_port = node.network_port();
+            assert_eq!(
+                cfg.network_config.backend.swarm.port, expected_net_port,
+                "network port mismatch for {identifier}"
+            );
+
+            assert_eq!(
+                multiaddr_port(&cfg.da_config.listening_address),
+                Some(node.da_port),
+                "DA listening port mismatch for {identifier}"
+            );
+            assert_eq!(
+                multiaddr_port(&cfg.blend_config.backend_core.listening_address),
+                Some(node.blend_port),
+                "blend listening port mismatch for {identifier}"
+            );
+
+            assert_eq!(
+                cfg.api_config.address.port(),
+                node.general.api_config.address.port(),
+                "api port mismatch for {identifier}"
+            );
+            assert_eq!(
+                cfg.api_config.testing_http_address.port(),
+                node.general.api_config.testing_http_address.port(),
+                "testing http port mismatch for {identifier}"
+            );
         }
     }
 
