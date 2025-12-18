@@ -112,9 +112,12 @@ matrix::forwarded_args() {
 
 matrix::log_has_nonzero_progress() {
   local log="$1"
+  # Use portable awk (no 3-arg match()) so this works on macOS / busybox.
   awk '
-    match($0, /height[^0-9]*([0-9]+)/, m) {
-      if (m[1] + 0 > 0) { ok = 1 }
+    match($0, /height[^0-9]*[0-9]+/) {
+      s = substr($0, RSTART, RLENGTH)
+      gsub(/[^0-9]/, "", s)
+      if (s + 0 > 0) { ok = 1 }
     }
     END { exit ok ? 0 : 1 }
   ' "${log}"
