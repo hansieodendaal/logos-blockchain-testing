@@ -25,25 +25,6 @@ pub enum BuilderInputError {
     },
 }
 
-macro_rules! non_zero_rate_fn {
-    ($name:ident, $message:literal) => {
-        const fn $name(rate: u64) -> NonZeroU64 {
-            match NonZeroU64::new(rate) {
-                Some(value) => value,
-                None => panic!($message),
-            }
-        }
-    };
-}
-
-non_zero_rate_fn!(
-    transaction_rate_checked,
-    "transaction rate must be non-zero"
-);
-
-non_zero_rate_fn!(channel_rate_checked, "channel rate must be non-zero");
-non_zero_rate_fn!(blob_rate_checked, "blob rate must be non-zero");
-
 /// Extension methods for building test scenarios with common patterns.
 pub trait ScenarioBuilderExt<Caps>: Sized {
     /// Configure a transaction flow workload.
@@ -100,9 +81,14 @@ impl<Caps> ScenarioBuilderExt<Caps> for CoreScenarioBuilder<Caps> {
     }
 
     fn initialize_wallet(self, total_funds: u64, users: usize) -> Self {
-        let user_count = NonZeroUsize::new(users).expect("wallet user count must be non-zero");
-        let wallet = WalletConfig::uniform(total_funds, user_count);
-        self.with_wallet_config(wallet)
+        let Some(user_count) = NonZeroUsize::new(users) else {
+            tracing::warn!(
+                users,
+                "wallet user count must be non-zero; ignoring initialize_wallet"
+            );
+            return self;
+        };
+        self.with_wallet_config(WalletConfig::uniform(total_funds, user_count))
     }
 }
 
@@ -203,8 +189,21 @@ impl ObservabilityBuilderExt for CoreScenarioBuilder<()> {
     }
 
     fn with_metrics_query_url_str(self, url: &str) -> CoreScenarioBuilder<ObservabilityCapability> {
-        let parsed = reqwest::Url::parse(url).expect("metrics query url must be valid");
-        self.with_metrics_query_url(parsed)
+        match reqwest::Url::parse(url) {
+            Ok(parsed) => self.with_metrics_query_url(parsed),
+            Err(err) => {
+                tracing::warn!(
+                    url,
+                    error = %err,
+                    "metrics query url must be valid; leaving metrics_query_url unset"
+                );
+                self.with_capabilities(ObservabilityCapability {
+                    metrics_query_url: None,
+                    metrics_otlp_ingest_url: None,
+                    grafana_url: None,
+                })
+            }
+        }
     }
 
     fn try_with_metrics_query_url_str(
@@ -234,8 +233,21 @@ impl ObservabilityBuilderExt for CoreScenarioBuilder<()> {
         self,
         url: &str,
     ) -> CoreScenarioBuilder<ObservabilityCapability> {
-        let parsed = reqwest::Url::parse(url).expect("metrics OTLP ingest url must be valid");
-        self.with_metrics_otlp_ingest_url(parsed)
+        match reqwest::Url::parse(url) {
+            Ok(parsed) => self.with_metrics_otlp_ingest_url(parsed),
+            Err(err) => {
+                tracing::warn!(
+                    url,
+                    error = %err,
+                    "metrics OTLP ingest url must be valid; leaving metrics_otlp_ingest_url unset"
+                );
+                self.with_capabilities(ObservabilityCapability {
+                    metrics_query_url: None,
+                    metrics_otlp_ingest_url: None,
+                    grafana_url: None,
+                })
+            }
+        }
     }
 
     fn try_with_metrics_otlp_ingest_url_str(
@@ -259,8 +271,21 @@ impl ObservabilityBuilderExt for CoreScenarioBuilder<()> {
     }
 
     fn with_grafana_url_str(self, url: &str) -> CoreScenarioBuilder<ObservabilityCapability> {
-        let parsed = reqwest::Url::parse(url).expect("grafana url must be valid");
-        self.with_grafana_url(parsed)
+        match reqwest::Url::parse(url) {
+            Ok(parsed) => self.with_grafana_url(parsed),
+            Err(err) => {
+                tracing::warn!(
+                    url,
+                    error = %err,
+                    "grafana url must be valid; leaving grafana_url unset"
+                );
+                self.with_capabilities(ObservabilityCapability {
+                    metrics_query_url: None,
+                    metrics_otlp_ingest_url: None,
+                    grafana_url: None,
+                })
+            }
+        }
     }
 
     fn try_with_grafana_url_str(
@@ -286,8 +311,17 @@ impl ObservabilityBuilderExt for CoreScenarioBuilder<ObservabilityCapability> {
     }
 
     fn with_metrics_query_url_str(self, url: &str) -> CoreScenarioBuilder<ObservabilityCapability> {
-        let parsed = reqwest::Url::parse(url).expect("metrics query url must be valid");
-        self.with_metrics_query_url(parsed)
+        match reqwest::Url::parse(url) {
+            Ok(parsed) => self.with_metrics_query_url(parsed),
+            Err(err) => {
+                tracing::warn!(
+                    url,
+                    error = %err,
+                    "metrics query url must be valid; leaving metrics_query_url unchanged"
+                );
+                self
+            }
+        }
     }
 
     fn try_with_metrics_query_url_str(
@@ -314,8 +348,17 @@ impl ObservabilityBuilderExt for CoreScenarioBuilder<ObservabilityCapability> {
         self,
         url: &str,
     ) -> CoreScenarioBuilder<ObservabilityCapability> {
-        let parsed = reqwest::Url::parse(url).expect("metrics OTLP ingest url must be valid");
-        self.with_metrics_otlp_ingest_url(parsed)
+        match reqwest::Url::parse(url) {
+            Ok(parsed) => self.with_metrics_otlp_ingest_url(parsed),
+            Err(err) => {
+                tracing::warn!(
+                    url,
+                    error = %err,
+                    "metrics OTLP ingest url must be valid; leaving metrics_otlp_ingest_url unchanged"
+                );
+                self
+            }
+        }
     }
 
     fn try_with_metrics_otlp_ingest_url_str(
@@ -339,8 +382,17 @@ impl ObservabilityBuilderExt for CoreScenarioBuilder<ObservabilityCapability> {
     }
 
     fn with_grafana_url_str(self, url: &str) -> CoreScenarioBuilder<ObservabilityCapability> {
-        let parsed = reqwest::Url::parse(url).expect("grafana url must be valid");
-        self.with_grafana_url(parsed)
+        match reqwest::Url::parse(url) {
+            Ok(parsed) => self.with_grafana_url(parsed),
+            Err(err) => {
+                tracing::warn!(
+                    url,
+                    error = %err,
+                    "grafana url must be valid; leaving grafana_url unchanged"
+                );
+                self
+            }
+        }
     }
 
     fn try_with_grafana_url_str(
@@ -365,7 +417,7 @@ pub struct TransactionFlowBuilder<Caps> {
 
 impl<Caps> TransactionFlowBuilder<Caps> {
     const fn default_rate() -> NonZeroU64 {
-        transaction_rate_checked(1)
+        NonZeroU64::MIN
     }
 
     const fn new(builder: CoreScenarioBuilder<Caps>) -> Self {
@@ -377,9 +429,15 @@ impl<Caps> TransactionFlowBuilder<Caps> {
     }
 
     #[must_use]
-    /// Set transaction submission rate per block (panics on zero).
-    pub const fn rate(mut self, rate: u64) -> Self {
-        self.rate = transaction_rate_checked(rate);
+    /// Set transaction submission rate per block (ignores zero).
+    pub fn rate(mut self, rate: u64) -> Self {
+        match NonZeroU64::new(rate) {
+            Some(rate) => self.rate = rate,
+            None => tracing::warn!(
+                rate,
+                "transaction rate must be non-zero; keeping previous rate"
+            ),
+        }
         self
     }
 
@@ -402,11 +460,14 @@ impl<Caps> TransactionFlowBuilder<Caps> {
 
     #[must_use]
     /// Limit how many users will submit transactions.
-    pub const fn users(mut self, users: usize) -> Self {
+    pub fn users(mut self, users: usize) -> Self {
         match NonZeroUsize::new(users) {
             Some(value) => self.users = Some(value),
-            None => panic!("transaction user count must be non-zero"),
-        }
+            None => tracing::warn!(
+                users,
+                "transaction user count must be non-zero; keeping previous setting"
+            ),
+        };
         self
     }
 
@@ -424,9 +485,7 @@ impl<Caps> TransactionFlowBuilder<Caps> {
     #[must_use]
     /// Attach the transaction workload to the scenario.
     pub fn apply(mut self) -> CoreScenarioBuilder<Caps> {
-        let workload = transaction::Workload::with_rate(self.rate.get())
-            .expect("transaction rate must be non-zero")
-            .with_user_limit(self.users);
+        let workload = transaction::Workload::new(self.rate).with_user_limit(self.users);
 
         tracing::info!(
             rate = self.rate.get(),
@@ -449,11 +508,11 @@ pub struct DataAvailabilityFlowBuilder<Caps> {
 
 impl<Caps> DataAvailabilityFlowBuilder<Caps> {
     const fn default_channel_rate() -> NonZeroU64 {
-        channel_rate_checked(1)
+        NonZeroU64::MIN
     }
 
     const fn default_blob_rate() -> NonZeroU64 {
-        blob_rate_checked(1)
+        NonZeroU64::MIN
     }
 
     const fn new(builder: CoreScenarioBuilder<Caps>) -> Self {
@@ -466,9 +525,15 @@ impl<Caps> DataAvailabilityFlowBuilder<Caps> {
     }
 
     #[must_use]
-    /// Set the number of DA channels to run (panics on zero).
-    pub const fn channel_rate(mut self, rate: u64) -> Self {
-        self.channel_rate = channel_rate_checked(rate);
+    /// Set the number of DA channels to run (ignores zero).
+    pub fn channel_rate(mut self, rate: u64) -> Self {
+        match NonZeroU64::new(rate) {
+            Some(rate) => self.channel_rate = rate,
+            None => tracing::warn!(
+                rate,
+                "DA channel rate must be non-zero; keeping previous rate"
+            ),
+        }
         self
     }
 
@@ -491,8 +556,11 @@ impl<Caps> DataAvailabilityFlowBuilder<Caps> {
 
     #[must_use]
     /// Set blob publish rate (per block).
-    pub const fn blob_rate(mut self, rate: u64) -> Self {
-        self.blob_rate = blob_rate_checked(rate);
+    pub fn blob_rate(mut self, rate: u64) -> Self {
+        match NonZeroU64::new(rate) {
+            Some(rate) => self.blob_rate = rate,
+            None => tracing::warn!(rate, "DA blob rate must be non-zero; keeping previous rate"),
+        }
         self
     }
 
@@ -607,27 +675,35 @@ impl ChaosRestartBuilder {
     #[must_use]
     /// Set the minimum delay between restart operations.
     pub fn min_delay(mut self, delay: Duration) -> Self {
-        assert!(!delay.is_zero(), "chaos restart min delay must be non-zero");
-        self.min_delay = delay;
+        if delay.is_zero() {
+            tracing::warn!("chaos restart min delay must be non-zero; keeping previous value");
+        } else {
+            self.min_delay = delay;
+        }
         self
     }
 
     #[must_use]
     /// Set the maximum delay between restart operations.
     pub fn max_delay(mut self, delay: Duration) -> Self {
-        assert!(!delay.is_zero(), "chaos restart max delay must be non-zero");
-        self.max_delay = delay;
+        if delay.is_zero() {
+            tracing::warn!("chaos restart max delay must be non-zero; keeping previous value");
+        } else {
+            self.max_delay = delay;
+        }
         self
     }
 
     #[must_use]
     /// Cooldown to allow between restarts for a target node.
     pub fn target_cooldown(mut self, cooldown: Duration) -> Self {
-        assert!(
-            !cooldown.is_zero(),
-            "chaos restart target cooldown must be non-zero"
-        );
-        self.target_cooldown = cooldown;
+        if cooldown.is_zero() {
+            tracing::warn!(
+                "chaos restart target cooldown must be non-zero; keeping previous value"
+            );
+        } else {
+            self.target_cooldown = cooldown;
+        }
         self
     }
 
@@ -648,18 +724,27 @@ impl ChaosRestartBuilder {
     #[must_use]
     /// Finalize the chaos restart workload and attach it to the scenario.
     pub fn apply(mut self) -> CoreScenarioBuilder<NodeControlCapability> {
-        assert!(
-            self.min_delay <= self.max_delay,
-            "chaos restart min delay must not exceed max delay"
-        );
-        assert!(
-            self.target_cooldown >= self.min_delay,
-            "chaos restart target cooldown must be >= min delay"
-        );
-        assert!(
-            self.include_validators || self.include_executors,
-            "chaos restart requires at least one node group"
-        );
+        if self.min_delay > self.max_delay {
+            tracing::warn!(
+                min_delay_secs = self.min_delay.as_secs(),
+                max_delay_secs = self.max_delay.as_secs(),
+                "chaos restart min delay exceeds max delay; swapping"
+            );
+            std::mem::swap(&mut self.min_delay, &mut self.max_delay);
+        }
+        if self.target_cooldown < self.min_delay {
+            tracing::warn!(
+                target_cooldown_secs = self.target_cooldown.as_secs(),
+                min_delay_secs = self.min_delay.as_secs(),
+                "chaos restart target cooldown must be >= min delay; bumping cooldown"
+            );
+            self.target_cooldown = self.min_delay;
+        }
+        if !self.include_validators && !self.include_executors {
+            tracing::warn!("chaos restart requires at least one node group; enabling all targets");
+            self.include_validators = true;
+            self.include_executors = true;
+        }
 
         let workload = RandomRestartWorkload::new(
             self.min_delay,
