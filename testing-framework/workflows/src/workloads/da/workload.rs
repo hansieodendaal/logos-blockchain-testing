@@ -28,8 +28,6 @@ use crate::{
 };
 
 const TEST_KEY_BYTES: [u8; 32] = [0u8; 32];
-const DEFAULT_BLOB_RATE_PER_BLOCK: u64 = 1;
-const DEFAULT_CHANNEL_RATE_PER_BLOCK: u64 = 1;
 const BLOB_CHUNK_OPTIONS: &[usize] = &[1, 2, 4, 8];
 const PUBLISH_RETRIES: usize = 5;
 const PUBLISH_RETRY_DELAY: Duration = Duration::from_secs(2);
@@ -44,11 +42,7 @@ pub struct Workload {
 
 impl Default for Workload {
     fn default() -> Self {
-        Self::with_rate(
-            NonZeroU64::new(DEFAULT_BLOB_RATE_PER_BLOCK).expect("non-zero"),
-            NonZeroU64::new(DEFAULT_CHANNEL_RATE_PER_BLOCK).expect("non-zero"),
-            DEFAULT_HEADROOM_PERCENT,
-        )
+        Self::with_rate(NonZeroU64::MIN, NonZeroU64::MIN, DEFAULT_HEADROOM_PERCENT)
     }
 }
 
@@ -139,7 +133,7 @@ async fn run_channel_flow(
     target_blobs: u64,
 ) -> Result<(), DynError> {
     tracing::debug!(channel_id = ?channel_id, "DA: submitting inscription tx");
-    let inscription_tx = Arc::new(tx::create_inscription_transaction_with_id(channel_id));
+    let inscription_tx = Arc::new(tx::create_inscription_transaction_with_id(channel_id)?);
     submit_transaction_via_cluster(ctx, Arc::clone(&inscription_tx)).await?;
 
     let mut receiver = ctx.block_feed().subscribe();
@@ -280,9 +274,7 @@ fn random_blob_payload() -> Vec<u8> {
     let mut rng = thread_rng();
     // KZGRS encoder expects the polynomial degree to be a power of two, which
     // effectively constrains the blob chunk count.
-    let chunks = *BLOB_CHUNK_OPTIONS
-        .choose(&mut rng)
-        .expect("non-empty chunk options");
+    let chunks = BLOB_CHUNK_OPTIONS.choose(&mut rng).copied().unwrap_or(1);
     let mut data = vec![0u8; 31 * chunks];
     rng.fill_bytes(&mut data);
     data

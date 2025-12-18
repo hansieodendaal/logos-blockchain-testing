@@ -19,6 +19,16 @@ use tokio::{pin, select, spawn, sync::broadcast, time::sleep};
 
 use super::workload::{planned_channel_count, planned_channel_ids};
 
+fn lock_or_recover<'a, T>(mutex: &'a Mutex<T>, name: &'static str) -> std::sync::MutexGuard<'a, T> {
+    match mutex.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => {
+            tracing::warn!(lock = name, "mutex poisoned; recovering inner value");
+            poisoned.into_inner()
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct DaWorkloadExpectation {
     blob_rate_per_block: NonZeroU64,
@@ -277,15 +287,12 @@ impl DaWorkloadExpectation {
     }
 
     fn missing_inscriptions(&self, state: &CaptureState) -> Vec<ChannelId> {
-        let inscriptions = state
-            .inscriptions
-            .lock()
-            .expect("inscription lock poisoned");
+        let inscriptions = lock_or_recover(&state.inscriptions, "da_inscriptions");
         missing_channels(&state.planned, &inscriptions)
     }
 
     fn observe_blobs(&self, state: &CaptureState) -> BlobObservation {
-        let blobs = state.blobs.lock().expect("blob lock poisoned");
+        let blobs = lock_or_recover(&state.blobs, "da_blobs");
         let observed_total_blobs = blobs.values().sum::<u64>();
         let channels_with_blobs = blobs
             .iter()
@@ -355,13 +362,13 @@ fn capture_block(
     }
 
     if !new_inscriptions.is_empty() {
-        let mut guard = inscriptions.lock().expect("inscription lock poisoned");
+        let mut guard = lock_or_recover(inscriptions, "da_inscriptions");
         guard.extend(new_inscriptions);
         tracing::debug!(count = guard.len(), "DA expectation captured inscriptions");
     }
 
     if !new_blobs.is_empty() {
-        let mut guard = blobs.lock().expect("blob lock poisoned");
+        let mut guard = lock_or_recover(blobs, "da_blobs");
         for channel in new_blobs {
             let entry = guard.entry(channel).or_insert(0);
             *entry += 1;

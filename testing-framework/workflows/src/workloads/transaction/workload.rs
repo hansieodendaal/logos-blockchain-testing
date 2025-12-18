@@ -157,7 +157,7 @@ impl Workload {
 
 impl Default for Workload {
     fn default() -> Self {
-        Self::new(NonZeroU64::new(1).expect("non-zero"))
+        Self::new(NonZeroU64::MIN)
     }
 }
 

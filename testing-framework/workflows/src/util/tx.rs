@@ -4,11 +4,11 @@ use nomos_core::mantle::{
     ledger::Tx as LedgerTx,
     ops::channel::{ChannelId, MsgId, inscribe::InscriptionOp},
 };
+use testing_framework_core::scenario::DynError;
 
 /// Builds a signed inscription transaction with deterministic payload for
 /// testing.
-#[must_use]
-pub fn create_inscription_transaction_with_id(id: ChannelId) -> SignedMantleTx {
+pub fn create_inscription_transaction_with_id(id: ChannelId) -> Result<SignedMantleTx, DynError> {
     let signing_key = Ed25519Key::from_bytes(&[0u8; 32]);
     let signer = signing_key.public_key();
 
@@ -31,10 +31,13 @@ pub fn create_inscription_transaction_with_id(id: ChannelId) -> SignedMantleTx {
     let zk_key = ZkKey::zero();
     tracing::debug!(channel = ?id, tx_hash = ?tx_hash, "building inscription transaction");
 
+    let zk_signature = ZkKey::multi_sign(&[zk_key], tx_hash.as_ref())
+        .map_err(|err| format!("zk signature generation failed: {err}"))?;
+
     SignedMantleTx::new(
         mantle_tx,
         vec![OpProof::Ed25519Sig(signature)],
-        ZkKey::multi_sign(&[zk_key], tx_hash.as_ref()).expect("zk signature generation"),
+        zk_signature,
     )
-    .expect("valid transaction")
+    .map_err(|err| format!("failed to build signed mantle transaction: {err}").into())
 }

@@ -93,7 +93,11 @@ impl RandomRestartWorkload {
         &self,
         targets: &[Target],
         cooldowns: &HashMap<Target, Instant>,
-    ) -> Target {
+    ) -> Result<Target, DynError> {
+        if targets.is_empty() {
+            return Err("chaos restart workload has no eligible targets".into());
+        }
+
         loop {
             let now = Instant::now();
             if let Some(next_ready) = cooldowns
@@ -121,13 +125,13 @@ impl RandomRestartWorkload {
 
             if let Some(choice) = available.choose(&mut thread_rng()).copied() {
                 tracing::debug!(?choice, "chaos restart picked target");
-                return choice;
+                return Ok(choice);
             }
 
-            return targets
-                .choose(&mut thread_rng())
-                .copied()
-                .expect("chaos restart workload has targets");
+            if let Some(choice) = targets.choose(&mut thread_rng()).copied() {
+                return Ok(choice);
+            }
+            return Err("chaos restart workload has no eligible targets".into());
         }
     }
 }
@@ -160,7 +164,7 @@ impl Workload for RandomRestartWorkload {
 
         loop {
             sleep(self.random_delay()).await;
-            let target = self.pick_target(&targets, &cooldowns).await;
+            let target = self.pick_target(&targets, &cooldowns).await?;
 
             match target {
                 Target::Validator(index) => {
