@@ -19,44 +19,46 @@ const DEFAULT_ROUND_DURATION: Duration = Duration::from_secs(1);
 
 #[must_use]
 pub fn default_e2e_deployment_settings() -> DeploymentSettings {
+    let normalization_constant = match NonNegativeF64::try_from(1.03f64) {
+        Ok(value) => value,
+        Err(_) => unsafe {
+            // Safety: normalization constant is a finite non-negative constant.
+            std::hint::unreachable_unchecked()
+        },
+    };
+    let message_frequency_per_round = match NonNegativeF64::try_from(1f64) {
+        Ok(value) => value,
+        Err(_) => unsafe {
+            // Safety: message frequency is a finite non-negative constant.
+            std::hint::unreachable_unchecked()
+        },
+    };
     DeploymentSettings::Custom(CustomDeployment {
         blend: BlendDeploymentSettings {
             common: BlendCommonSettings {
-                minimum_network_size: NonZeroU64::try_from(30u64)
-                    .expect("Minimum network size cannot be zero."),
-                num_blend_layers: NonZeroU64::try_from(3)
-                    .expect("Number of blend layers cannot be zero."),
+                minimum_network_size: unsafe { NonZeroU64::new_unchecked(30) },
+                num_blend_layers: unsafe { NonZeroU64::new_unchecked(3) },
                 timing: TimingSettings {
                     round_duration: DEFAULT_ROUND_DURATION,
-                    rounds_per_interval: NonZeroU64::try_from(30u64)
-                        .expect("Rounds per interval cannot be zero."),
+                    rounds_per_interval: unsafe { NonZeroU64::new_unchecked(30) },
                     // (21,600 blocks * 30s per block) / 1s per round = 648,000 rounds
-                    rounds_per_session: NonZeroU64::try_from(648_000u64)
-                        .expect("Rounds per session cannot be zero."),
-                    rounds_per_observation_window: NonZeroU64::try_from(30u64)
-                        .expect("Rounds per observation window cannot be zero."),
-                    rounds_per_session_transition_period: NonZeroU64::try_from(30u64)
-                        .expect("Rounds per session transition period cannot be zero."),
-                    epoch_transition_period_in_slots: NonZeroU64::try_from(2_600)
-                        .expect("Epoch transition period in slots cannot be zero."),
+                    rounds_per_session: unsafe { NonZeroU64::new_unchecked(648_000) },
+                    rounds_per_observation_window: unsafe { NonZeroU64::new_unchecked(30) },
+                    rounds_per_session_transition_period: unsafe { NonZeroU64::new_unchecked(30) },
+                    epoch_transition_period_in_slots: unsafe { NonZeroU64::new_unchecked(2_600) },
                 },
                 protocol_name: StreamProtocol::new("/blend/integration-tests"),
             },
             core: BlendCoreSettings {
-                minimum_messages_coefficient: NonZeroU64::try_from(1)
-                    .expect("Minimum messages coefficient cannot be zero."),
-                normalization_constant: 1.03f64
-                    .try_into()
-                    .expect("Normalization constant cannot be negative."),
+                minimum_messages_coefficient: unsafe { NonZeroU64::new_unchecked(1) },
+                normalization_constant,
                 scheduler: SchedulerSettings {
                     cover: CoverTrafficSettings {
                         intervals_for_safety_buffer: 100,
-                        message_frequency_per_round: NonNegativeF64::try_from(1f64)
-                            .expect("Message frequency per round cannot be negative."),
+                        message_frequency_per_round,
                     },
                     delayer: MessageDelayerSettings {
-                        maximum_release_delay_in_rounds: NonZeroU64::try_from(3u64)
-                            .expect("Maximum release delay between rounds cannot be zero."),
+                        maximum_release_delay_in_rounds: unsafe { NonZeroU64::new_unchecked(3) },
                     },
                 },
             },

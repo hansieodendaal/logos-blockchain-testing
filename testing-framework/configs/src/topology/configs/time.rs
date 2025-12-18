@@ -25,7 +25,9 @@ pub struct GeneralTimeConfig {
 #[must_use]
 pub fn default_time_config() -> GeneralTimeConfig {
     let slot_duration = std::env::var(CONSENSUS_SLOT_TIME_VAR)
-        .map(|s| <u64>::from_str(&s).unwrap())
+        .ok()
+        .and_then(|raw| u64::from_str(&raw).ok())
+        .filter(|value| *value > 0)
         .unwrap_or(DEFAULT_SLOT_TIME);
 
     GeneralTimeConfig {
