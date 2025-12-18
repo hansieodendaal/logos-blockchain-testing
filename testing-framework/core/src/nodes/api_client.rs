@@ -21,6 +21,14 @@ use tracing::error;
 pub const DA_GET_TESTING_ENDPOINT_ERROR: &str = "Failed to connect to testing endpoint. The binary was likely built without the 'testing' \
      feature. Try: cargo build --workspace --all-features";
 
+#[derive(Debug, thiserror::Error)]
+pub enum ApiClientError {
+    #[error("{DA_GET_TESTING_ENDPOINT_ERROR}")]
+    TestingEndpointUnavailable,
+    #[error(transparent)]
+    Request(#[from] reqwest::Error),
+}
+
 /// Thin async client for node HTTP/testing endpoints.
 #[derive(Clone)]
 pub struct ApiClient {
@@ -154,6 +162,26 @@ impl ApiClient {
     }
 
     /// POST JSON to the testing API and return the raw response.
+    pub async fn post_testing_json_response_checked<T>(
+        &self,
+        path: &str,
+        body: &T,
+    ) -> Result<Response, ApiClientError>
+    where
+        T: Serialize + Sync + ?Sized,
+    {
+        let testing_url = self
+            .testing_url
+            .as_ref()
+            .ok_or(ApiClientError::TestingEndpointUnavailable)?;
+        self.client
+            .post(Self::join_url(testing_url, path))
+            .json(body)
+            .send()
+            .await
+            .map_err(ApiClientError::Request)
+    }
+
     pub async fn post_testing_json_response<T>(
         &self,
         path: &str,
@@ -162,27 +190,39 @@ impl ApiClient {
     where
         T: Serialize + Sync + ?Sized,
     {
-        let testing_url = self
-            .testing_url
-            .as_ref()
-            .expect(DA_GET_TESTING_ENDPOINT_ERROR);
-        self.client
-            .post(Self::join_url(testing_url, path))
-            .json(body)
-            .send()
-            .await
+        match self.post_testing_json_response_checked(path, body).await {
+            Ok(resp) => Ok(resp),
+            Err(ApiClientError::Request(err)) => Err(err),
+            Err(ApiClientError::TestingEndpointUnavailable) => {
+                panic!("{DA_GET_TESTING_ENDPOINT_ERROR}")
+            }
+        }
     }
 
     /// GET from the testing API and return the raw response.
-    pub async fn get_testing_response(&self, path: &str) -> reqwest::Result<Response> {
+    pub async fn get_testing_response_checked(
+        &self,
+        path: &str,
+    ) -> Result<Response, ApiClientError> {
         let testing_url = self
             .testing_url
             .as_ref()
-            .expect(DA_GET_TESTING_ENDPOINT_ERROR);
+            .ok_or(ApiClientError::TestingEndpointUnavailable)?;
         self.client
             .get(Self::join_url(testing_url, path))
             .send()
             .await
+            .map_err(ApiClientError::Request)
+    }
+
+    pub async fn get_testing_response(&self, path: &str) -> reqwest::Result<Response> {
+        match self.get_testing_response_checked(path).await {
+            Ok(resp) => Ok(resp),
+            Err(ApiClientError::Request(err)) => Err(err),
+            Err(ApiClientError::TestingEndpointUnavailable) => {
+                panic!("{DA_GET_TESTING_ENDPOINT_ERROR}")
+            }
+        }
     }
 
     /// Block a peer via the DA testing API.
@@ -258,6 +298,19 @@ impl ApiClient {
     }
 
     /// Query DA membership via testing API.
+    pub async fn da_get_membership_checked(
+        &self,
+        session_id: &SessionNumber,
+    ) -> Result<MembershipResponse, ApiClientError> {
+        self.post_testing_json_response_checked(DA_GET_MEMBERSHIP, session_id)
+            .await?
+            .error_for_status()
+            .map_err(ApiClientError::Request)?
+            .json()
+            .await
+            .map_err(ApiClientError::Request)
+    }
+
     pub async fn da_get_membership(
         &self,
         session_id: &SessionNumber,

@@ -4,7 +4,7 @@ use reqwest::{Client, Url};
 use thiserror::Error;
 
 use super::ReadinessCheck;
-use crate::topology::deployment::Topology;
+use crate::{nodes::ApiClientError, topology::deployment::Topology};
 
 #[derive(Debug, Error)]
 pub enum MembershipError {
@@ -15,7 +15,9 @@ pub enum MembershipError {
         message: String,
     },
     #[error(transparent)]
-    Request(#[from] reqwest::Error),
+    Http(#[from] reqwest::Error),
+    #[error(transparent)]
+    ApiClient(#[from] ApiClientError),
 }
 
 #[derive(Debug)]
@@ -50,7 +52,7 @@ impl<'a> ReadinessCheck<'a> for MembershipReadiness<'a> {
                 async move {
                     let result = node
                         .api()
-                        .da_get_membership(&self.session)
+                        .da_get_membership_checked(&self.session)
                         .await
                         .map_err(MembershipError::from);
                     NodeMembershipStatus { label, result }
@@ -72,7 +74,7 @@ impl<'a> ReadinessCheck<'a> for MembershipReadiness<'a> {
                 async move {
                     let result = node
                         .api()
-                        .da_get_membership(&self.session)
+                        .da_get_membership_checked(&self.session)
                         .await
                         .map_err(MembershipError::from);
                     NodeMembershipStatus { label, result }
@@ -164,12 +166,12 @@ pub async fn try_fetch_membership(
         .json(&session)
         .send()
         .await
-        .map_err(MembershipError::Request)?
+        .map_err(MembershipError::Http)?
         .error_for_status()
-        .map_err(MembershipError::Request)?
+        .map_err(MembershipError::Http)?
         .json()
         .await
-        .map_err(MembershipError::Request)
+        .map_err(MembershipError::Http)
 }
 
 #[deprecated(note = "use try_fetch_membership to avoid panics and preserve error details")]
@@ -181,7 +183,7 @@ pub async fn fetch_membership(
     try_fetch_membership(client, base, session)
         .await
         .map_err(|err| match err {
-            MembershipError::Request(source) => source,
+            MembershipError::Http(source) => source,
             MembershipError::JoinUrl {
                 base,
                 path,
@@ -189,6 +191,7 @@ pub async fn fetch_membership(
             } => {
                 panic!("failed to join url {base} with path {path}: {message}")
             }
+            MembershipError::ApiClient(err) => panic!("{err}"),
         })
 }
 

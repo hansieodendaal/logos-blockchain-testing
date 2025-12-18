@@ -5,7 +5,7 @@ pub mod validator;
 
 use std::sync::LazyLock;
 
-pub use api_client::ApiClient;
+pub use api_client::{ApiClient, ApiClientError};
 use tempfile::TempDir;
 
 pub(crate) const LOGS_PREFIX: &str = "__logs";
