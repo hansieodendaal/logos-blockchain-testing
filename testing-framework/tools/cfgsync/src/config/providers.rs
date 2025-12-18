@@ -98,7 +98,6 @@ pub fn create_providers(
     consensus_configs: &[GeneralConsensusConfig],
     blend_configs: &[GeneralBlendConfig],
     da_configs: &[GeneralDaConfig],
-) -> Vec<ProviderInfo> {
+) -> Result<Vec<ProviderInfo>, ProviderBuildError> {
     try_create_providers(hosts, consensus_configs, blend_configs, da_configs)
-        .expect("failed to build providers")
 }

@@ -28,7 +28,6 @@ use crate::{
     network::rewrite_initial_peers,
 };
 
-#[must_use]
 pub fn create_node_configs(
     consensus_params: &ConsensusParams,
     da_params: &DaParams,
@@ -38,7 +37,7 @@ pub fn create_node_configs(
     da_ports: Option<Vec<u16>>,
     blend_ports: Option<Vec<u16>>,
     hosts: Vec<Host>,
-) -> HashMap<Host, GeneralConfig> {
+) -> Result<HashMap<Host, GeneralConfig>, NodeConfigBuildError> {
     try_create_node_configs(
         consensus_params,
         da_params,
@@ -49,7 +48,6 @@ pub fn create_node_configs(
         blend_ports,
         hosts,
     )
-    .expect("failed to build cfgsync node configs")
 }
 
 #[derive(Debug, Error)]
@@ -77,6 +75,8 @@ pub enum NodeConfigBuildError {
     MissingConsensusConfig,
     #[error("host/config length mismatch")]
     HostConfigLenMismatch,
+    #[error(transparent)]
+    PeerRewrite(#[from] crate::network::peers::PeerRewriteError),
 }
 
 pub fn try_create_node_configs(
@@ -137,7 +137,7 @@ pub fn try_create_node_configs(
         &original_network_ports,
         &hosts,
         &peer_ids,
-    );
+    )?;
 
     let providers = try_create_providers(&hosts, &consensus_configs, &blend_configs, &da_configs)?;
 
@@ -182,7 +182,7 @@ pub fn try_create_node_configs(
         }
 
         let mut network_config = network_configs[i].clone();
-        network_config.backend.swarm.host = Ipv4Addr::from_str("0.0.0.0").unwrap();
+        network_config.backend.swarm.host = Ipv4Addr::UNSPECIFIED;
         network_config.backend.swarm.port = host.network_port;
         network_config.backend.initial_peers = host_network_init_peers[i].clone();
         let nat_value = format!("/ip4/{}/udp/{}/quic-v1", host.ip, host.network_port);

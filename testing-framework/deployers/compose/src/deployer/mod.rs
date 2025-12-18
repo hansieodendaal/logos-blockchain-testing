@@ -125,7 +125,8 @@ mod tests {
             Some(topology.nodes().map(|node| node.da_port).collect()),
             Some(topology.nodes().map(|node| node.blend_port).collect()),
             hosts,
-        );
+        )
+        .expect("cfgsync config generation should succeed");
         let configs_by_identifier: HashMap<_, _> = configs
             .into_iter()
             .map(|(host, config)| (host.identifier, config))
@@ -179,7 +180,8 @@ mod tests {
             Some(topology.nodes().map(|node| node.da_port).collect()),
             Some(topology.nodes().map(|node| node.blend_port).collect()),
             hosts,
-        );
+        )
+        .expect("cfgsync config generation should succeed");
         let configs_by_identifier: HashMap<_, _> = configs
             .into_iter()
             .map(|(host, config)| (host.identifier, config))
@@ -217,7 +219,8 @@ mod tests {
             Some(topology.nodes().map(|node| node.da_port).collect()),
             Some(topology.nodes().map(|node| node.blend_port).collect()),
             hosts,
-        );
+        )
+        .expect("cfgsync config generation should succeed");
 
         for (host, config) in configs {
             let genesis = &config.consensus_config.genesis_tx;
@@ -250,7 +253,8 @@ mod tests {
             Some(topology.nodes().map(|node| node.da_port).collect()),
             Some(topology.nodes().map(|node| node.blend_port).collect()),
             hosts,
-        );
+        )
+        .expect("cfgsync config generation should succeed");
         let configs_by_identifier: HashMap<_, _> = configs
             .into_iter()
             .map(|(host, config)| (host.identifier, config))

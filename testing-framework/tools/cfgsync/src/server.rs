@@ -173,14 +173,25 @@ async fn validator_config(
     };
 
     let (reply_tx, reply_rx) = channel();
-    config_repo.register(Host::validator_from_ip(ip, identifier, ports), reply_tx);
+    config_repo
+        .register(Host::validator_from_ip(ip, identifier, ports), reply_tx)
+        .await;
 
     (reply_rx.await).map_or_else(
         |_| (StatusCode::INTERNAL_SERVER_ERROR, "Error receiving config").into_response(),
         |config_response| match config_response {
             RepoResponse::Config(config) => {
                 let config = create_validator_config(*config);
-                let mut value = to_value(&config).expect("validator config should serialize");
+                let mut value = match to_value(&config) {
+                    Ok(value) => value,
+                    Err(err) => {
+                        return (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            format!("failed to serialize validator config: {err}"),
+                        )
+                            .into_response();
+                    }
+                };
 
                 inject_defaults(&mut value);
                 override_api_ports(&mut value, &ports);
@@ -219,14 +230,25 @@ async fn executor_config(
     };
 
     let (reply_tx, reply_rx) = channel();
-    config_repo.register(Host::executor_from_ip(ip, identifier, ports), reply_tx);
+    config_repo
+        .register(Host::executor_from_ip(ip, identifier, ports), reply_tx)
+        .await;
 
     (reply_rx.await).map_or_else(
         |_| (StatusCode::INTERNAL_SERVER_ERROR, "Error receiving config").into_response(),
         |config_response| match config_response {
             RepoResponse::Config(config) => {
                 let config = create_executor_config(*config);
-                let mut value = to_value(&config).expect("executor config should serialize");
+                let mut value = match to_value(&config) {
+                    Ok(value) => value,
+                    Err(err) => {
+                        return (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            format!("failed to serialize executor config: {err}"),
+                        )
+                            .into_response();
+                    }
+                };
 
                 inject_defaults(&mut value);
                 override_api_ports(&mut value, &ports);

@@ -1,14 +1,13 @@
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-    time::Duration,
-};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use nomos_tracing_service::TracingSettings;
 use testing_framework_config::topology::configs::{
     GeneralConfig, consensus::ConsensusParams, da::DaParams, wallet::WalletConfig,
 };
-use tokio::{sync::oneshot::Sender, time::timeout};
+use tokio::{
+    sync::{Mutex, oneshot::Sender},
+    time::timeout,
+};
 use tracing::{error, info, warn};
 
 use crate::{config::builder::try_create_node_configs, host::Host, server::CfgSyncConfig};
@@ -92,8 +91,8 @@ impl ConfigRepo {
         repo
     }
 
-    pub fn register(&self, host: Host, reply_tx: Sender<RepoResponse>) {
-        let mut waiting_hosts = self.waiting_hosts.lock().unwrap();
+    pub async fn register(&self, host: Host, reply_tx: Sender<RepoResponse>) {
+        let mut waiting_hosts = self.waiting_hosts.lock().await;
         waiting_hosts.insert(host, reply_tx);
     }
 
@@ -106,7 +105,10 @@ impl ConfigRepo {
         {
             info!("all hosts have announced their IPs");
 
-            let mut waiting_hosts = self.waiting_hosts.lock().unwrap();
+            let mut waiting_hosts = {
+                let mut guard = self.waiting_hosts.lock().await;
+                std::mem::take(&mut *guard)
+            };
             let hosts = waiting_hosts.keys().cloned().collect();
 
             let configs = match try_create_node_configs(
@@ -145,7 +147,10 @@ impl ConfigRepo {
         } else {
             warn!("timeout: not all hosts announced within the time limit");
 
-            let mut waiting_hosts = self.waiting_hosts.lock().unwrap();
+            let mut waiting_hosts = {
+                let mut guard = self.waiting_hosts.lock().await;
+                std::mem::take(&mut *guard)
+            };
             for (_, sender) in waiting_hosts.drain() {
                 let _ = sender.send(RepoResponse::Timeout);
             }
@@ -154,7 +159,8 @@ impl ConfigRepo {
 
     async fn wait_for_hosts(&self) {
         loop {
-            if self.waiting_hosts.lock().unwrap().len() >= self.n_hosts {
+            let len = { self.waiting_hosts.lock().await.len() };
+            if len >= self.n_hosts {
                 break;
             }
             tokio::time::sleep(HOST_POLLING_INTERVAL).await;
