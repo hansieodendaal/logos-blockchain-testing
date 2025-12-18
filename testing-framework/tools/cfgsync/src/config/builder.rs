@@ -8,16 +8,10 @@ use rand::{Rng as _, thread_rng};
 use testing_framework_config::topology::configs::{
     GeneralConfig,
     api::GeneralApiConfig,
-    blend,
-    blend::create_blend_configs,
-    bootstrap,
-    bootstrap::{SHORT_PROLONGED_BOOTSTRAP_PERIOD, create_bootstrap_configs},
-    consensus,
-    consensus::{ConsensusParams, create_consensus_configs, create_genesis_tx_with_declarations},
-    da,
-    da::{DaParams, try_create_da_configs},
-    network,
-    network::{NetworkParams, create_network_configs},
+    base::{BaseConfigError, BaseConfigs, build_base_configs},
+    consensus::{ConsensusParams, create_genesis_tx_with_declarations},
+    da::DaParams,
+    network::NetworkParams,
     time::default_time_config,
     wallet::WalletConfig,
 };
@@ -65,9 +59,7 @@ pub enum NodeConfigBuildError {
     #[error(transparent)]
     Providers(#[from] ProviderBuildError),
     #[error(transparent)]
-    Da(#[from] da::DaConfigError),
-    #[error(transparent)]
-    Network(#[from] network::NetworkConfigError),
+    Base(#[from] BaseConfigError),
     #[error("failed to allocate an available UDP port")]
     PortAllocFailed,
     #[error("failed to parse multiaddr '{value}': {message}")]
@@ -116,10 +108,11 @@ pub fn try_create_node_configs(
         network_configs,
         blend_configs,
     } = build_base_configs(
+        &ids,
         consensus_params,
         da_params,
+        &NetworkParams::default(),
         wallet_config,
-        &ids,
         &ports,
         &blend_ports,
     )?;
@@ -261,23 +254,6 @@ fn resolve_blend_ports(hosts: &[Host], blend_ports: Option<Vec<u16>>) -> Vec<u16
     blend_ports.unwrap_or_else(|| hosts.iter().map(|h| h.blend_port).collect())
 }
 
-fn build_base_configs(
-    consensus_params: &ConsensusParams,
-    da_params: &DaParams,
-    wallet_config: &WalletConfig,
-    ids: &[[u8; 32]],
-    da_ports: &[u16],
-    blend_ports: &[u16],
-) -> Result<BaseConfigs, NodeConfigBuildError> {
-    Ok(BaseConfigs {
-        consensus_configs: create_consensus_configs(ids, consensus_params, wallet_config),
-        bootstrap_configs: create_bootstrap_configs(ids, SHORT_PROLONGED_BOOTSTRAP_PERIOD),
-        da_configs: try_create_da_configs(ids, da_params, da_ports)?,
-        network_configs: create_network_configs(ids, &NetworkParams::default())?,
-        blend_configs: create_blend_configs(ids, blend_ports),
-    })
-}
-
 fn build_api_configs(hosts: &[Host]) -> Result<Vec<GeneralApiConfig>, NodeConfigBuildError> {
     hosts
         .iter()
@@ -313,12 +289,4 @@ fn build_peer_ids(ids: &[[u8; 32]]) -> Result<Vec<PeerId>, NodeConfigBuildError>
             ))
         })
         .collect()
-}
-
-struct BaseConfigs {
-    consensus_configs: Vec<consensus::GeneralConsensusConfig>,
-    bootstrap_configs: Vec<bootstrap::GeneralBootstrapConfig>,
-    da_configs: Vec<da::GeneralDaConfig>,
-    network_configs: Vec<network::GeneralNetworkConfig>,
-    blend_configs: Vec<blend::GeneralBlendConfig>,
 }

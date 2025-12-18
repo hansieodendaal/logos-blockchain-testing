@@ -1,4 +1,5 @@
 pub mod api;
+pub mod base;
 pub mod blend;
 pub mod bootstrap;
 pub mod consensus;
