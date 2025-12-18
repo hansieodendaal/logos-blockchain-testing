@@ -24,18 +24,9 @@ async fn main() {
         process::exit(1);
     }
 
-    let validators = read_env_any(
-        &["NOMOS_DEMO_VALIDATORS", "LOCAL_DEMO_VALIDATORS"],
-        DEFAULT_VALIDATORS,
-    );
-    let executors = read_env_any(
-        &["NOMOS_DEMO_EXECUTORS", "LOCAL_DEMO_EXECUTORS"],
-        DEFAULT_EXECUTORS,
-    );
-    let run_secs = read_env_any(
-        &["NOMOS_DEMO_RUN_SECS", "LOCAL_DEMO_RUN_SECS"],
-        DEFAULT_RUN_SECS,
-    );
+    let validators = read_env_any(&["NOMOS_DEMO_VALIDATORS"], DEFAULT_VALIDATORS);
+    let executors = read_env_any(&["NOMOS_DEMO_EXECUTORS"], DEFAULT_EXECUTORS);
+    let run_secs = read_env_any(&["NOMOS_DEMO_RUN_SECS"], DEFAULT_RUN_SECS);
 
     info!(
         validators,

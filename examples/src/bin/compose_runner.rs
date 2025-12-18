@@ -40,20 +40,11 @@ async fn main() {
 
     tracing_subscriber::fmt::init();
 
-    let validators = read_env_any(
-        &["NOMOS_DEMO_VALIDATORS", "COMPOSE_DEMO_VALIDATORS"],
-        DEFAULT_VALIDATORS,
-    );
+    let validators = read_env_any(&["NOMOS_DEMO_VALIDATORS"], DEFAULT_VALIDATORS);
 
-    let executors = read_env_any(
-        &["NOMOS_DEMO_EXECUTORS", "COMPOSE_DEMO_EXECUTORS"],
-        DEFAULT_EXECUTORS,
-    );
+    let executors = read_env_any(&["NOMOS_DEMO_EXECUTORS"], DEFAULT_EXECUTORS);
 
-    let run_secs = read_env_any(
-        &["NOMOS_DEMO_RUN_SECS", "COMPOSE_DEMO_RUN_SECS"],
-        DEFAULT_RUN_SECS,
-    );
+    let run_secs = read_env_any(&["NOMOS_DEMO_RUN_SECS"], DEFAULT_RUN_SECS);
 
     info!(
         validators,
