@@ -18,6 +18,7 @@ use nomos_node::NomosDaMembership;
 use num_bigint::BigUint;
 use rand::random;
 use subnetworks_assignations::{MembershipCreator as _, MembershipHandler as _};
+use thiserror::Error;
 use tracing::warn;
 
 use crate::secret_key_to_peer_id;
@@ -168,9 +169,43 @@ pub fn create_da_configs(
     da_params: &DaParams,
     ports: &[u16],
 ) -> Vec<GeneralDaConfig> {
+    try_create_da_configs(ids, da_params, ports).expect("failed to build DA configs")
+}
+
+#[derive(Debug, Error)]
+pub enum DaConfigError {
+    #[error("DA ports length mismatch (ids={ids}, ports={ports})")]
+    PortsLenMismatch { ids: usize, ports: usize },
+    #[error(
+        "DA subnetwork size too large for u16 subnetwork ids (effective_subnetwork_size={effective_subnetwork_size}, max={max})"
+    )]
+    SubnetworkTooLarge {
+        effective_subnetwork_size: usize,
+        max: usize,
+    },
+}
+
+pub fn try_create_da_configs(
+    ids: &[[u8; 32]],
+    da_params: &DaParams,
+    ports: &[u16],
+) -> Result<Vec<GeneralDaConfig>, DaConfigError> {
     // Let the subnetwork size track the participant count so tiny local topologies
     // can form a membership.
     let effective_subnetwork_size = da_params.subnetwork_size.max(ids.len().max(1));
+    let max_subnetworks = u16::MAX as usize + 1;
+    if effective_subnetwork_size > max_subnetworks {
+        return Err(DaConfigError::SubnetworkTooLarge {
+            effective_subnetwork_size,
+            max: max_subnetworks,
+        });
+    }
+    if ports.len() < ids.len() {
+        return Err(DaConfigError::PortsLenMismatch {
+            ids: ids.len(),
+            ports: ports.len(),
+        });
+    }
     let mut node_keys = vec![];
     let mut peer_ids = vec![];
     let mut listening_addresses = vec![];
@@ -199,7 +234,7 @@ pub fn create_da_configs(
         let mut assignations: HashMap<u16, HashSet<PeerId>> = HashMap::new();
         if peer_ids.is_empty() {
             for id in 0..effective_subnetwork_size {
-                assignations.insert(u16::try_from(id).unwrap_or_default(), HashSet::new());
+                assignations.insert(id as u16, HashSet::new());
             }
         } else {
             let mut sorted_peers = peer_ids.clone();
@@ -214,14 +249,15 @@ pub fn create_da_configs(
                         members.insert(*peer);
                     }
                 }
-                assignations.insert(u16::try_from(id).unwrap_or_default(), members);
+                assignations.insert(id as u16, members);
             }
         }
 
         template.init(SessionNumber::default(), assignations)
     };
 
-    ids.iter()
+    Ok(ids
+        .iter()
         .zip(node_keys)
         .enumerate()
         .map(|(i, (id, node_key))| {
@@ -267,5 +303,31 @@ pub fn create_da_configs(
                 retry_commitments_limit: da_params.retry_commitments_limit,
             }
         })
-        .collect()
+        .collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn try_create_da_configs_rejects_subnetwork_overflow() {
+        let ids = vec![[1u8; 32]];
+        let ports = vec![12345u16];
+        let mut params = DaParams::default();
+        params.subnetwork_size = u16::MAX as usize + 2;
+
+        let err = try_create_da_configs(&ids, &params, &ports).unwrap_err();
+        assert!(matches!(err, DaConfigError::SubnetworkTooLarge { .. }));
+    }
+
+    #[test]
+    fn try_create_da_configs_rejects_port_mismatch() {
+        let ids = vec![[1u8; 32], [2u8; 32]];
+        let ports = vec![12345u16];
+        let params = DaParams::default();
+
+        let err = try_create_da_configs(&ids, &params, &ports).unwrap_err();
+        assert!(matches!(err, DaConfigError::PortsLenMismatch { .. }));
+    }
 }

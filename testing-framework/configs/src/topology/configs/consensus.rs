@@ -146,25 +146,8 @@ fn create_genesis_tx(utxos: &[Utxo]) -> GenesisTx {
     GenesisTx::from_tx(signed_mantle_tx).expect("Invalid genesis transaction")
 }
 
-#[must_use]
-pub fn create_consensus_configs(
-    ids: &[[u8; 32]],
-    consensus_params: &ConsensusParams,
-    wallet: &WalletConfig,
-) -> Vec<GeneralConsensusConfig> {
-    let mut leader_keys = Vec::new();
-    let mut blend_notes = Vec::new();
-    let mut da_notes = Vec::new();
-
-    let utxos = create_utxos_for_leader_and_services(
-        ids,
-        &mut leader_keys,
-        &mut blend_notes,
-        &mut da_notes,
-    );
-    let utxos = append_wallet_utxos(utxos, wallet);
-    let genesis_tx = create_genesis_tx(&utxos);
-    let ledger_config = nomos_ledger::Config {
+fn build_ledger_config(consensus_params: &ConsensusParams) -> nomos_ledger::Config {
+    nomos_ledger::Config {
         epoch_config: EpochConfig {
             epoch_stake_distribution_stabilization: NonZero::new(3).unwrap(),
             epoch_period_nonce_buffer: NonZero::new(3).unwrap(),
@@ -213,7 +196,28 @@ pub fn create_consensus_configs(
                 },
             },
         },
-    };
+    }
+}
+
+#[must_use]
+pub fn create_consensus_configs(
+    ids: &[[u8; 32]],
+    consensus_params: &ConsensusParams,
+    wallet: &WalletConfig,
+) -> Vec<GeneralConsensusConfig> {
+    let mut leader_keys = Vec::new();
+    let mut blend_notes = Vec::new();
+    let mut da_notes = Vec::new();
+
+    let utxos = create_utxos_for_leader_and_services(
+        ids,
+        &mut leader_keys,
+        &mut blend_notes,
+        &mut da_notes,
+    );
+    let utxos = append_wallet_utxos(utxos, wallet);
+    let genesis_tx = create_genesis_tx(&utxos);
+    let ledger_config = build_ledger_config(consensus_params);
 
     leader_keys
         .into_iter()
@@ -235,17 +239,6 @@ fn create_utxos_for_leader_and_services(
     blend_notes: &mut Vec<ServiceNote>,
     da_notes: &mut Vec<ServiceNote>,
 ) -> Vec<Utxo> {
-    let derive_key_material = |prefix: &[u8], id_bytes: &[u8]| -> [u8; 16] {
-        let mut sk_data = [0; 16];
-        let prefix_len = prefix.len();
-
-        sk_data[..prefix_len].copy_from_slice(prefix);
-        let remaining_len = 16 - prefix_len;
-        sk_data[prefix_len..].copy_from_slice(&id_bytes[..remaining_len]);
-
-        sk_data
-    };
-
     let mut utxos = Vec::new();
 
     // Assume output index which will be set by the ledger tx.
@@ -253,53 +246,66 @@ fn create_utxos_for_leader_and_services(
 
     // Create notes for leader, Blend and DA declarations.
     for &id in ids {
-        let sk_leader_data = derive_key_material(b"ld", &id);
-        let sk_leader = UnsecuredZkKey::from(BigUint::from_bytes_le(&sk_leader_data));
-        let pk_leader = sk_leader.to_public_key();
-        leader_keys.push((pk_leader, sk_leader));
-        utxos.push(Utxo {
-            note: Note::new(1_000, pk_leader),
-            tx_hash: BigUint::from(0u8).into(),
-            output_index: 0,
-        });
-        output_index += 1;
-
-        let sk_da_data = derive_key_material(b"da", &id);
-        let sk_da = ZkKey::from(BigUint::from_bytes_le(&sk_da_data));
-        let pk_da = sk_da.to_public_key();
-        let note_da = Note::new(1, pk_da);
-        da_notes.push(ServiceNote {
-            pk: pk_da,
-            sk: sk_da,
-            note: note_da,
-            output_index,
-        });
-        utxos.push(Utxo {
-            note: note_da,
-            tx_hash: BigUint::from(0u8).into(),
-            output_index: 0,
-        });
-        output_index += 1;
-
-        let sk_blend_data = derive_key_material(b"bn", &id);
-        let sk_blend = ZkKey::from(BigUint::from_bytes_le(&sk_blend_data));
-        let pk_blend = sk_blend.to_public_key();
-        let note_blend = Note::new(1, pk_blend);
-        blend_notes.push(ServiceNote {
-            pk: pk_blend,
-            sk: sk_blend,
-            note: note_blend,
-            output_index,
-        });
-        utxos.push(Utxo {
-            note: note_blend,
-            tx_hash: BigUint::from(0u8).into(),
-            output_index: 0,
-        });
-        output_index += 1;
+        output_index = push_leader_utxo(id, leader_keys, &mut utxos, output_index);
+        output_index = push_service_note(b"da", id, da_notes, &mut utxos, output_index);
+        output_index = push_service_note(b"bn", id, blend_notes, &mut utxos, output_index);
     }
 
     utxos
+}
+
+fn derive_key_material(prefix: &[u8], id_bytes: &[u8; 32]) -> [u8; 16] {
+    let mut sk_data = [0; 16];
+    let prefix_len = prefix.len();
+
+    sk_data[..prefix_len].copy_from_slice(prefix);
+    let remaining_len = 16 - prefix_len;
+    sk_data[prefix_len..].copy_from_slice(&id_bytes[..remaining_len]);
+
+    sk_data
+}
+
+fn push_leader_utxo(
+    id: [u8; 32],
+    leader_keys: &mut Vec<(ZkPublicKey, UnsecuredZkKey)>,
+    utxos: &mut Vec<Utxo>,
+    output_index: usize,
+) -> usize {
+    let sk_data = derive_key_material(b"ld", &id);
+    let sk = UnsecuredZkKey::from(BigUint::from_bytes_le(&sk_data));
+    let pk = sk.to_public_key();
+    leader_keys.push((pk, sk));
+    utxos.push(Utxo {
+        note: Note::new(1_000, pk),
+        tx_hash: BigUint::from(0u8).into(),
+        output_index: 0,
+    });
+    output_index + 1
+}
+
+fn push_service_note(
+    prefix: &[u8],
+    id: [u8; 32],
+    notes: &mut Vec<ServiceNote>,
+    utxos: &mut Vec<Utxo>,
+    output_index: usize,
+) -> usize {
+    let sk_data = derive_key_material(prefix, &id);
+    let sk = ZkKey::from(BigUint::from_bytes_le(&sk_data));
+    let pk = sk.to_public_key();
+    let note = Note::new(1, pk);
+    notes.push(ServiceNote {
+        pk,
+        sk,
+        note,
+        output_index,
+    });
+    utxos.push(Utxo {
+        note,
+        tx_hash: BigUint::from(0u8).into(),
+        output_index: 0,
+    });
+    output_index + 1
 }
 
 fn append_wallet_utxos(mut utxos: Vec<Utxo>, wallet: &WalletConfig) -> Vec<Utxo> {

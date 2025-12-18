@@ -7215,6 +7215,7 @@ dependencies = [
  "rand 0.8.5",
  "serde",
  "subnetworks-assignations",
+ "thiserror 2.0.17",
  "time",
  "tracing",
 ]

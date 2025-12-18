@@ -94,6 +94,10 @@ fn initial_peers_by_network_layout(
     swarm_configs: &[SwarmConfig],
     network_params: &NetworkParams,
 ) -> Vec<Vec<Multiaddr>> {
+    if swarm_configs.is_empty() {
+        return Vec::new();
+    }
+
     let mut all_initial_peers = vec![];
 
     match network_params.libp2p_network_layout {
