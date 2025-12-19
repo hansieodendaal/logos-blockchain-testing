@@ -15,7 +15,7 @@ use testing_framework_core::scenario::{DynError, Expectation, RunContext};
 use thiserror::Error;
 use tokio::{sync::broadcast, time::sleep};
 
-use super::workload::{limited_user_count, submission_plan};
+use super::workload::{SubmissionPlan, limited_user_count, submission_plan};
 
 const MIN_INCLUSION_RATIO: f64 = 0.5;
 const CATCHUP_POLL_INTERVAL: Duration = Duration::from_secs(1);
@@ -74,13 +74,7 @@ impl Expectation for TxInclusionExpectation {
             return Ok(());
         }
 
-        let wallet_accounts = ctx.descriptors().config().wallet().accounts.clone();
-        if wallet_accounts.is_empty() {
-            return Err(TxExpectationError::MissingAccounts.into());
-        }
-
-        let available = limited_user_count(self.user_limit, wallet_accounts.len());
-        let plan = submission_plan(self.txs_per_block, ctx, available)?;
+        let (plan, tracked_accounts) = build_capture_plan(self, ctx)?;
         if plan.transaction_count == 0 {
             return Err(TxExpectationError::NoPlannedTransactions.into());
         }
@@ -92,50 +86,12 @@ impl Expectation for TxInclusionExpectation {
             "tx inclusion expectation starting capture"
         );
 
-        let wallet_pks = wallet_accounts
-            .into_iter()
-            .take(plan.transaction_count)
-            .map(|account| account.secret_key.to_public_key())
-            .collect::<HashSet<ZkPublicKey>>();
-
         let observed = Arc::new(AtomicU64::new(0));
-        let receiver = ctx.block_feed().subscribe();
-        let tracked_accounts: Arc<HashSet<ZkPublicKey>> = Arc::new(wallet_pks);
-        let spawn_accounts: Arc<HashSet<ZkPublicKey>> = Arc::clone(&tracked_accounts);
-        let spawn_observed = Arc::clone(&observed);
-
-        tokio::spawn(async move {
-            let mut receiver = receiver;
-            let genesis_parent = HeaderId::from([0; 32]);
-            tracing::debug!("tx inclusion capture task started");
-            loop {
-                match receiver.recv().await {
-                    Ok(record) => {
-                        if record.block.header().parent_block() == genesis_parent {
-                            continue;
-                        }
-
-                        for tx in record.block.transactions() {
-                            for note in &tx.mantle_tx().ledger_tx.outputs {
-                                if spawn_accounts.contains(&note.pk) {
-                                    spawn_observed.fetch_add(1, Ordering::Relaxed);
-                                    tracing::debug!(pk = ?note.pk, "tx inclusion observed account output");
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    Err(broadcast::error::RecvError::Lagged(skipped)) => {
-                        tracing::debug!(skipped, "tx inclusion capture lagged");
-                    }
-                    Err(broadcast::error::RecvError::Closed) => {
-                        tracing::debug!("tx inclusion capture feed closed");
-                        break;
-                    }
-                }
-            }
-            tracing::debug!("tx inclusion capture task exiting");
-        });
+        spawn_tx_inclusion_capture(
+            ctx.block_feed().subscribe(),
+            Arc::new(tracked_accounts),
+            Arc::clone(&observed),
+        );
 
         self.capture_state = Some(CaptureState {
             observed,
@@ -187,6 +143,75 @@ impl Expectation for TxInclusionExpectation {
                 "tx inclusion expectation failed"
             );
             Err(TxExpectationError::InsufficientInclusions { observed, required }.into())
+        }
+    }
+}
+
+fn build_capture_plan(
+    expectation: &TxInclusionExpectation,
+    ctx: &RunContext,
+) -> Result<(SubmissionPlan, HashSet<ZkPublicKey>), DynError> {
+    let wallet_accounts = ctx.descriptors().config().wallet().accounts.clone();
+    if wallet_accounts.is_empty() {
+        return Err(TxExpectationError::MissingAccounts.into());
+    }
+
+    let available = limited_user_count(expectation.user_limit, wallet_accounts.len());
+    let plan = submission_plan(expectation.txs_per_block, ctx, available)?;
+
+    let wallet_pks = wallet_accounts
+        .into_iter()
+        .take(plan.transaction_count)
+        .map(|account| account.secret_key.to_public_key())
+        .collect::<HashSet<ZkPublicKey>>();
+
+    Ok((plan, wallet_pks))
+}
+
+fn spawn_tx_inclusion_capture(
+    mut receiver: broadcast::Receiver<Arc<testing_framework_core::scenario::BlockRecord>>,
+    tracked_accounts: Arc<HashSet<ZkPublicKey>>,
+    observed: Arc<AtomicU64>,
+) {
+    tokio::spawn(async move {
+        let genesis_parent = HeaderId::from([0; 32]);
+        tracing::debug!("tx inclusion capture task started");
+
+        loop {
+            match receiver.recv().await {
+                Ok(record) => {
+                    if record.block.header().parent_block() == genesis_parent {
+                        continue;
+                    }
+
+                    capture_tx_outputs(record.as_ref(), &tracked_accounts, &observed);
+                }
+                Err(broadcast::error::RecvError::Lagged(skipped)) => {
+                    tracing::debug!(skipped, "tx inclusion capture lagged");
+                }
+                Err(broadcast::error::RecvError::Closed) => {
+                    tracing::debug!("tx inclusion capture feed closed");
+                    break;
+                }
+            }
+        }
+
+        tracing::debug!("tx inclusion capture task exiting");
+    });
+}
+
+fn capture_tx_outputs(
+    record: &testing_framework_core::scenario::BlockRecord,
+    tracked_accounts: &HashSet<ZkPublicKey>,
+    observed: &AtomicU64,
+) {
+    for tx in record.block.transactions() {
+        for note in &tx.mantle_tx().ledger_tx.outputs {
+            if tracked_accounts.contains(&note.pk) {
+                observed.fetch_add(1, Ordering::Relaxed);
+                tracing::debug!(pk = ?note.pk, "tx inclusion observed account output");
+                break;
+            }
         }
     }
 }

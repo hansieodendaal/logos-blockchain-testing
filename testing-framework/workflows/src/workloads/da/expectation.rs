@@ -102,11 +102,7 @@ impl Expectation for DaWorkloadExpectation {
             return Ok(());
         }
 
-        let planned_ids = planned_channel_ids(planned_channel_count(
-            self.channel_rate_per_block,
-            self.headroom_percent,
-        ));
-
+        let planned_ids = self.planned_channel_ids();
         let run_duration = ctx.run_metrics().run_duration();
 
         tracing::info!(
@@ -117,65 +113,22 @@ impl Expectation for DaWorkloadExpectation {
             "DA inclusion expectation starting capture"
         );
 
-        let planned = Arc::new(planned_ids.iter().copied().collect::<HashSet<_>>());
-        let inscriptions = Arc::new(Mutex::new(HashSet::new()));
-        let blobs = Arc::new(Mutex::new(HashMap::new()));
-        let run_blocks = Arc::new(AtomicU64::new(0));
+        let capture = build_capture_state(planned_ids, run_duration);
+        let block_feed = ctx.block_feed();
 
-        {
-            let run_blocks = Arc::clone(&run_blocks);
-            let mut receiver = ctx.block_feed().subscribe();
-            spawn(async move {
-                let timer = sleep(run_duration);
-                pin!(timer);
-
-                loop {
-                    select! {
-                        _ = &mut timer => break,
-                        result = receiver.recv() => match result {
-                            Ok(_) => {
-                                run_blocks.fetch_add(1, Ordering::Relaxed);
-                            }
-                            Err(broadcast::error::RecvError::Lagged(_)) => {}
-                            Err(broadcast::error::RecvError::Closed) => break,
-                        }
-                    }
-                }
-            });
-        }
-
-        let mut receiver = ctx.block_feed().subscribe();
-        let planned_for_task = Arc::clone(&planned);
-        let inscriptions_for_task = Arc::clone(&inscriptions);
-        let blobs_for_task = Arc::clone(&blobs);
-
-        spawn(async move {
-            loop {
-                match receiver.recv().await {
-                    Ok(record) => capture_block(
-                        record.as_ref(),
-                        &planned_for_task,
-                        &inscriptions_for_task,
-                        &blobs_for_task,
-                    ),
-                    Err(broadcast::error::RecvError::Lagged(skipped)) => {
-                        tracing::debug!(skipped, "DA expectation: receiver lagged");
-                    }
-                    Err(broadcast::error::RecvError::Closed) => {
-                        tracing::debug!("DA expectation: block feed closed");
-                        break;
-                    }
-                }
-            }
-        });
-
-        self.capture_state = Some(CaptureState {
-            planned,
-            inscriptions,
-            blobs,
-            run_blocks,
+        spawn_run_block_counter(
+            Arc::clone(&capture.run_blocks),
             run_duration,
-        });
+            block_feed.clone(),
+        );
+        spawn_da_capture(
+            Arc::clone(&capture.planned),
+            Arc::clone(&capture.inscriptions),
+            Arc::clone(&capture.blobs),
+            block_feed,
+        );
+
+        self.capture_state = Some(capture);
 
         Ok(())
     }
@@ -202,6 +155,13 @@ struct BlobObservation {
 }
 
 impl DaWorkloadExpectation {
+    fn planned_channel_ids(&self) -> Vec<ChannelId> {
+        planned_channel_ids(planned_channel_count(
+            self.channel_rate_per_block,
+            self.headroom_percent,
+        ))
+    }
+
     fn capture_state(&self) -> Result<&CaptureState, DynError> {
         self.capture_state
             .as_ref()
@@ -336,6 +296,65 @@ impl DaWorkloadExpectation {
             .get()
             .saturating_mul(effective_blocks)
     }
+}
+
+fn build_capture_state(planned_ids: Vec<ChannelId>, run_duration: Duration) -> CaptureState {
+    CaptureState {
+        planned: Arc::new(planned_ids.into_iter().collect()),
+        inscriptions: Arc::new(Mutex::new(HashSet::new())),
+        blobs: Arc::new(Mutex::new(HashMap::new())),
+        run_blocks: Arc::new(AtomicU64::new(0)),
+        run_duration,
+    }
+}
+
+fn spawn_run_block_counter(
+    run_blocks: Arc<AtomicU64>,
+    run_duration: Duration,
+    block_feed: testing_framework_core::scenario::BlockFeed,
+) {
+    let mut receiver = block_feed.subscribe();
+    spawn(async move {
+        let timer = sleep(run_duration);
+        pin!(timer);
+
+        loop {
+            select! {
+                _ = &mut timer => break,
+                result = receiver.recv() => match result {
+                    Ok(_) => {
+                        run_blocks.fetch_add(1, Ordering::Relaxed);
+                    }
+                    Err(broadcast::error::RecvError::Lagged(_)) => {}
+                    Err(broadcast::error::RecvError::Closed) => break,
+                }
+            }
+        }
+    });
+}
+
+fn spawn_da_capture(
+    planned: Arc<HashSet<ChannelId>>,
+    inscriptions: Arc<Mutex<HashSet<ChannelId>>>,
+    blobs: Arc<Mutex<HashMap<ChannelId, u64>>>,
+    block_feed: testing_framework_core::scenario::BlockFeed,
+) {
+    let mut receiver = block_feed.subscribe();
+
+    spawn(async move {
+        loop {
+            match receiver.recv().await {
+                Ok(record) => capture_block(record.as_ref(), &planned, &inscriptions, &blobs),
+                Err(broadcast::error::RecvError::Lagged(skipped)) => {
+                    tracing::debug!(skipped, "DA expectation: receiver lagged");
+                }
+                Err(broadcast::error::RecvError::Closed) => {
+                    tracing::debug!("DA expectation: block feed closed");
+                    break;
+                }
+            }
+        }
+    });
 }
 
 fn capture_block(
