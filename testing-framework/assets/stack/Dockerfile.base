@@ -20,7 +20,7 @@ ARG CIRCUITS_PLATFORM
 
 LABEL maintainer="augustinas@status.im" \
     source="https://github.com/logos-co/nomos-node" \
-    description="Nomos testnet build image"
+    description="Logos testnet build image"
 
 WORKDIR /workspace
 COPY . .
@@ -61,7 +61,7 @@ FROM ubuntu:24.04 AS base
 
 LABEL maintainer="augustinas@status.im" \
     source="https://github.com/logos-co/nomos-node" \
-    description="Nomos base runtime image (testing)"
+    description="Logos base runtime image (testing)"
 
 RUN apt-get update && apt-get install -yq \
     libstdc++6 \

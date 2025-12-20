@@ -12,7 +12,7 @@ use testing_framework_core::scenario::{
 
 use crate::{errors::ComposeRunnerError, lifecycle::cleanup::RunnerCleanup};
 
-/// Docker Compose-based deployer for Nomos test scenarios.
+/// Docker Compose-based deployer for Logos test scenarios.
 #[derive(Clone, Copy)]
 pub struct ComposeDeployer {
     readiness_checks: bool,

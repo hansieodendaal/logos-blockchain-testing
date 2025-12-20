@@ -273,14 +273,20 @@ scripts/run/run-examples.sh -t 60 -v 3 -e 1 compose
 
 - Runners do **not** provision Grafana automatically (but `scripts/setup/setup-observability.sh` can)
 - If you set `NOMOS_GRAFANA_URL`, the deployer prints it in `TESTNET_ENDPOINTS`
-- Dashboards live in `testing-framework/assets/stack/monitoring/grafana/dashboards/` for import into your Grafana
+- Dashboards live in `testing-framework/assets/stack/monitoring/grafana/dashboards/` (the bundled stack auto-provisions them)
 
 **Example:**
 
 ```bash
+# Bring up the bundled Prometheus+Grafana stack (optional)
+scripts/setup/setup-observability.sh compose up
+eval $(scripts/setup/setup-observability.sh compose env)
+
 export NOMOS_GRAFANA_URL=http://localhost:3000
 POL_PROOF_DEV_MODE=true scripts/run/run-examples.sh -t 60 -v 3 -e 1 compose
 ```
+
+**Default bundled Grafana login:** `admin` / `admin` (see `scripts/observability/compose/docker-compose.yml`).
 
 ### Node APIs
 

@@ -1,8 +1,8 @@
-# Nomos Testing Framework
+# Logos Testing Framework
 
 **Declarative, multi-node blockchain testing for the Logos network**
 
-The Nomos Testing Framework enables you to test consensus, data availability, and transaction workloads across local processes, Docker Compose, and Kubernetes deployments—all with a unified scenario API.
+The Logos Testing Framework enables you to test consensus, data availability, and transaction workloads across local processes, Docker Compose, and Kubernetes deployments—all with a unified scenario API.
 
 [**Get Started**](quickstart.md)
 
@@ -131,9 +131,9 @@ Check the **[Developer Reference](part-iii.md)** to implement custom workloads, 
 
 These roles interact tightly, which is why meaningful testing must be performed in multi-node environments that include real networking, timing, and DA interaction.
 
-The Nomos Testing Framework provides the infrastructure to orchestrate these multi-node scenarios reliably across development, CI, and production-like environments.
+The Logos Testing Framework provides the infrastructure to orchestrate these multi-node scenarios reliably across development, CI, and production-like environments.
 
-**Learn more about the protocol:** [Nomos Project Documentation](https://nomos-tech.notion.site/project)
+**Learn more about the protocol:** [Logos Project Documentation](https://nomos-tech.notion.site/project)
 
 ---
 
@@ -144,8 +144,8 @@ The Nomos Testing Framework provides the infrastructure to orchestrate these mul
 | **[Foundations](part-i.md)** | Architecture, philosophy, and design principles |
 | **[User Guide](part-ii.md)** | Writing and running scenarios, workloads, and expectations |
 | **[Developer Reference](part-iii.md)** | Extending the framework with custom components |
-| **[Operations & Deployment](part-v.md)** | Setup, CI integration, and environment configuration |
-| **[Appendix](part-vi.md)** | Quick reference, troubleshooting, FAQ, and glossary |
+| **[Operations & Deployment](part-iv.md)** | Setup, CI integration, and environment configuration |
+| **[Appendix](part-v.md)** | Quick reference, troubleshooting, FAQ, and glossary |
 
 ---
 

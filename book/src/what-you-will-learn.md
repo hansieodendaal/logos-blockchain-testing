@@ -56,7 +56,7 @@ without changing the plan.
 
 ## What This Book Does NOT Cover
 
-- **Nomos node internals** — This book focuses on testing infrastructure, not the blockchain protocol implementation. See the Nomos node repository for protocol documentation.
+- **Logos node internals** — This book focuses on testing infrastructure, not the blockchain protocol implementation. See the Logos node repository (`nomos-node`) for protocol documentation.
 - **Consensus algorithm theory** — We assume familiarity with basic blockchain concepts (validators, blocks, transactions, data availability).
 - **Rust language basics** — Examples use Rust, but we don't teach the language. See [The Rust Book](https://doc.rust-lang.org/book/) if you're new to Rust.
 - **Kubernetes administration** — We show how to use the K8s runner, but don't cover cluster setup, networking, or operations.

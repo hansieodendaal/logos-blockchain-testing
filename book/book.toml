@@ -1,5 +1,5 @@
 [book]
-authors  = ["Nomos Testing"]
+authors  = ["Logos Testing"]
 language = "en"
 src      = "src"
 title    = "Logos Blockchain Testing Framework Book"

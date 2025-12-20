@@ -419,7 +419,7 @@ rg "github.com.*404" src/
 rg "(TODO|FIXME|XXX)" src/
 
 # Check for inconsistent terminology
-rg "(Nomos node|nomos blockchain)" src/  # Should be "Logos"
+rg "(Nomos node|nomos blockchain)" src/  # Should be "Logos node|Logos blockchain"
 ```
 
 ---

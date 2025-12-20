@@ -126,7 +126,7 @@ build_test_image::print_config() {
   echo "Dockerfile: ${DOCKERFILE_PATH}"
   echo "Base image tag: ${BASE_IMAGE_TAG}"
   echo "Base Dockerfile: ${BASE_DOCKERFILE_PATH}"
-  echo "Nomos node rev: ${NOMOS_NODE_REV}"
+  echo "Logos node rev: ${NOMOS_NODE_REV}"
   echo "Circuits override: ${CIRCUITS_OVERRIDE:-<none>}"
   echo "Circuits version (download fallback): ${VERSION}"
   echo "Circuits platform: ${CIRCUITS_PLATFORM}"

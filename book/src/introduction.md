@@ -1,6 +1,6 @@
 # Introduction
 
-The Nomos Testing Framework is a purpose-built toolkit for exercising Logos in
+The Logos Testing Framework is a purpose-built toolkit for exercising Logos in
 realistic, multi-node environments. It solves the gap between small, isolated
 tests and full-system validation by letting teams describe a cluster layout,
 drive meaningful traffic, and assert the outcomes in one coherent plan.
@@ -43,4 +43,4 @@ runner.run(&mut scenario).await?;
 
 This pattern—topology, workloads, expectations, duration—repeats across all scenarios in this book.
 
-**Learn more:** For protocol-level documentation and node internals, see the [Nomos Project Documentation](https://nomos-tech.notion.site/project).
+**Learn more:** For protocol-level documentation and node internals, see the [Logos Project Documentation](https://nomos-tech.notion.site/project).

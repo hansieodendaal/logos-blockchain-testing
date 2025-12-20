@@ -481,17 +481,17 @@ cargo run -p runner-examples --bin local_runner
 
 When a test fails, check these in order:
 
-1. ✅ **`POL_PROOF_DEV_MODE=true` is set** (REQUIRED for all runners)
-2. ✅ **`versions.env` exists at repo root**
-3. ✅ **KZG circuit assets present** (for DA workloads): `testing-framework/assets/stack/kzgrs_test_params/kzgrs_test_params`
-4. ✅ **Node binaries available** (`NOMOS_NODE_BIN` / `NOMOS_EXECUTOR_BIN` set, or using `run-examples.sh`)
-5. ✅ **Docker daemon running** (for compose/k8s)
-6. ✅ **Docker image built** (`logos-blockchain-testing:local` exists for compose/k8s)
-7. ✅ **No port conflicts** (`lsof -i :18080`, kill orphaned processes)
-8. ✅ **Sufficient wallets** (`.wallets(N)` ≥ `.users(M)`)
-9. ✅ **Enough resources** (Docker memory 8GB+, ulimit -n 4096)
-10. ✅ **Run duration appropriate** (long enough for consensus timing)
-11. ✅ **Logs persisted** (`NOMOS_LOG_DIR` + `NOMOS_TESTS_KEEP_LOGS=1` if needed)
+1. **`POL_PROOF_DEV_MODE=true` is set** (REQUIRED for all runners)
+2. **`versions.env` exists at repo root**
+3. **KZG circuit assets present** (for DA workloads): `testing-framework/assets/stack/kzgrs_test_params/kzgrs_test_params`
+4. **Node binaries available** (`NOMOS_NODE_BIN` / `NOMOS_EXECUTOR_BIN` set, or using `run-examples.sh`)
+5. **Docker daemon running** (for compose/k8s)
+6. **Docker image built** (`logos-blockchain-testing:local` exists for compose/k8s)
+7. **No port conflicts** (`lsof -i :18080`, kill orphaned processes)
+8. **Sufficient wallets** (`.wallets(N)` ≥ `.users(M)`)
+9. **Enough resources** (Docker memory 8GB+, ulimit -n 4096)
+10. **Run duration appropriate** (long enough for consensus timing)
+11. **Logs persisted** (`NOMOS_LOG_DIR` + `NOMOS_TESTS_KEEP_LOGS=1` if needed)
 
 **Still stuck?** Check node logs (see [Where to Find Logs](#where-to-find-logs)) for the actual error.
 

@@ -21,7 +21,7 @@ Compose:
 
 Kubernetes:
   - Installs prometheus-community/kube-prometheus-stack into namespace
-    "nomos-observability" and optionally loads Nomos Grafana dashboards.
+    "logos-observability" and optionally loads Logos Grafana dashboards.
   - Prints port-forward commands + NOMOS_METRICS_* / NOMOS_GRAFANA_URL exports.
 USAGE
 }
@@ -49,8 +49,8 @@ export NOMOS_GRAFANA_URL=http://localhost:3000
 EOF
 }
 
-k8s_namespace() { echo "nomos-observability"; }
-k8s_release() { echo "nomos-observability"; }
+k8s_namespace() { echo "${LOGOS_OBSERVABILITY_NAMESPACE:-${NOMOS_OBSERVABILITY_NAMESPACE:-logos-observability}}"; }
+k8s_release() { echo "${LOGOS_OBSERVABILITY_RELEASE:-${NOMOS_OBSERVABILITY_RELEASE:-logos-observability}}"; }
 k8s_values() { echo "${ROOT}/scripts/observability/k8s/kube-prometheus-stack.values.yaml"; }
 
 k8s_install() {
@@ -103,7 +103,7 @@ k8s_apply_dashboards() {
   local file base name
   for file in "${dash_dir}"/*.json; do
     base="$(basename "${file}" .json)"
-    name="nomos-dashboard-${base//[^a-zA-Z0-9-]/-}"
+    name="logos-dashboard-${base//[^a-zA-Z0-9-]/-}"
     kubectl -n "${ns}" create configmap "${name}" \
       --from-file="$(basename "${file}")=${file}" \
       --dry-run=client -o yaml | kubectl apply -f -

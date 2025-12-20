@@ -55,4 +55,4 @@
 
 ## External Resources
 
-- **[Nomos Project Documentation](https://nomos-tech.notion.site/project)** — Protocol specifications, node internals, and architecture details
+- **[Logos Project Documentation](https://nomos-tech.notion.site/project)** — Protocol specifications, node internals, and architecture details

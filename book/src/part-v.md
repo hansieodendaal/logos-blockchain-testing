@@ -1,44 +1,28 @@
-# Part V — Operations & Deployment
+# Part V — Appendix
 
-This section covers operational aspects of running the testing framework: prerequisites, deployment configuration, continuous integration, and observability.
+Quick reference materials, troubleshooting guides, and supplementary information.
 
-## What You'll Learn
+## Contents
 
-- **Prerequisites & Setup**: Required files, binaries, circuit assets, and environment configuration
-- **Running Examples**: How to execute scenarios across host, compose, and k8s runners
-- **CI Integration**: Automating tests in continuous integration pipelines with caching and matrix testing
-- **Environment Variables**: Complete reference of all configuration variables
-- **Logging & Observability**: Log collection strategies, metrics integration, and debugging techniques
+- **Builder API Quick Reference**: Cheat sheet for DSL methods
+- **Troubleshooting Scenarios**: Common issues and their solutions, including "What Failure Looks Like" with realistic examples
+- **FAQ**: Frequently asked questions
+- **Glossary**: Terminology reference
 
-## Who This Section Is For
+## When to Use This Section
 
-- **Operators** setting up the framework for the first time
-- **DevOps Engineers** integrating tests into CI/CD pipelines
-- **Developers** debugging test failures or performance issues
-- **Platform Engineers** deploying across different environments (local, Docker, Kubernetes)
+- **Quick lookups**: Find DSL method signatures without reading full guides
+- **Debugging failures**: Match symptoms to known issues and fixes
+- **Clarifying concepts**: Look up unfamiliar terms in the glossary
+- **Common questions**: Check FAQ before asking for help
 
-## Navigation
-
-This section is organized for progressive depth:
-
-1. Start with [Operations Overview](operations-overview.md) for the big picture
-2. Follow [Prerequisites & Setup](prerequisites.md) to prepare your environment
-3. Use [Running Examples](running-examples.md) to execute your first scenarios
-4. Integrate with [CI Integration](ci-integration.md) for automated testing
-5. Reference [Environment Variables](environment-variables.md) for complete configuration options
-6. Debug with [Logging & Observability](logging-observability.md) when issues arise
-
-## Key Principles
-
-**Operational Hygiene:** Assets present, prerequisites satisfied, observability reachable
-
-**Environment Fit:** Choose the right deployment target based on isolation, reproducibility, and resource needs
-
-**Clear Signals:** Verify runners report node readiness before starting workloads
-
-**Failure Triage:** Map failures to specific causes—missing prerequisites, platform issues, or unmet expectations
+This section complements the main documentation with practical reference materials that you'll return to frequently during development and operations.
 
 ---
 
-Ready to get started? Begin with [Operations Overview](operations-overview.md) →
+Jump to:
+- [Builder API Quick Reference](dsl-cheat-sheet.md)
+- [Troubleshooting Scenarios](troubleshooting.md)
+- [FAQ](faq.md)
+- [Glossary](glossary.md)
 

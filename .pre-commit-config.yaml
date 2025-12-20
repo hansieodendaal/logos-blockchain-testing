@@ -11,7 +11,7 @@ repos:
       - id: clippy
         args: ["--all", "--all-targets", "--all-features", "--", "-D", "warnings"]
   - repo: https://github.com/EmbarkStudios/cargo-deny
-    rev: 0.18.2
+    rev: 0.18.9
     hooks:
       - id: cargo-deny
         args:

@@ -16,7 +16,7 @@ resolver = "2"
 
 [workspace.package]
 categories  = []
-description = "Nomos testing framework workspace (split out from nomos-node)"
+description = "Logos testing framework workspace (split out from nomos-node)"
 edition     = "2024"
 keywords    = ["framework", "nomos", "testing"]
 license     = "MIT OR Apache-2.0"
@@ -40,7 +40,7 @@ testing-framework-runner-k8s     = { default-features = false, path = "testing-f
 testing-framework-runner-local   = { default-features = false, path = "testing-framework/deployers/local" }
 testing-framework-workflows      = { default-features = false, path = "testing-framework/workflows" }
 
-# Nomos git dependencies (pinned to latest master)
+# Logos git dependencies (pinned to latest master)
 broadcast-service = { default-features = false, git = "https://github.com/logos-co/nomos-node.git", rev = "1fce2dc3f482c16361316eb2a1b6ccd1206aa917" }
 cfgsync = { default-features = false, path = "testing-framework/tools/cfgsync" }
 chain-leader = { default-features = false, git = "https://github.com/logos-co/nomos-node.git", rev = "1fce2dc3f482c16361316eb2a1b6ccd1206aa917", features = [
