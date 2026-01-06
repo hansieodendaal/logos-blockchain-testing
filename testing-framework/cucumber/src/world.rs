@@ -117,7 +117,7 @@ impl TestingFrameworkWorld {
     ) -> StepResult {
         self.spec.topology = Some(TopologySpec {
             validators: positive_usize("validators", validators)?,
-            executors: positive_usize("executors", executors)?,
+            executors,
             network,
         });
         Ok(())
@@ -236,14 +236,23 @@ impl TestingFrameworkWorld {
                 .is_some_and(|p| p.is_file())
                 || shared_host_bin_path("nomos-node").is_file();
 
-            let exec_ok = env::var_os("NOMOS_EXECUTOR_BIN")
-                .map(PathBuf::from)
-                .is_some_and(|p| p.is_file())
-                || shared_host_bin_path("nomos-executor").is_file();
+            let requires_executor_bin = self
+                .spec
+                .topology
+                .is_some_and(|topology| topology.executors > 0);
+
+            let exec_ok = if requires_executor_bin {
+                env::var_os("NOMOS_EXECUTOR_BIN")
+                    .map(PathBuf::from)
+                    .is_some_and(|p| p.is_file())
+                    || shared_host_bin_path("nomos-executor").is_file()
+            } else {
+                true
+            };
 
             if !(node_ok && exec_ok) {
                 return Err(StepError::Preflight {
-                    message: "Missing Logos host binaries. Set NOMOS_NODE_BIN and NOMOS_EXECUTOR_BIN, or run `scripts/run/run-examples.sh host` to restore them into `testing-framework/assets/stack/bin`.".to_owned(),
+                    message: "Missing Logos host binaries. Set NOMOS_NODE_BIN (and NOMOS_EXECUTOR_BIN if your scenario uses executors), or run `scripts/run/run-examples.sh host` to restore them into `testing-framework/assets/stack/bin`.".to_owned(),
                 });
             }
         }
