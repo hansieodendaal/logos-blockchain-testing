@@ -174,6 +174,7 @@ impl ConsensusLiveness {
             .map(|sample| sample.height)
             .max()
             .unwrap_or(0);
+        let max_height_nodes = format_max_height_nodes(&check.samples, max_height);
 
         let mut target = target_hint;
         if target == 0 || target > max_height {
@@ -216,13 +217,20 @@ impl ConsensusLiveness {
             );
             Ok(())
         } else {
+            if let Some(nodes) = max_height_nodes.as_deref() {
+                tracing::warn!(
+                    max_height,
+                    nodes,
+                    "consensus liveness: highest observed node(s)"
+                );
+            }
             for issue in &check.issues {
                 tracing::warn!(?issue, "consensus liveness issue");
             }
 
             Err(Box::new(ConsensusLivenessError::Violations {
                 target,
-                details: check.issues.into(),
+                details: ViolationIssues::new(check.issues, max_height_nodes),
             }))
         }
     }
@@ -246,14 +254,45 @@ struct LivenessCheck {
 
 impl From<Vec<ConsensusLivenessIssue>> for ViolationIssues {
     fn from(issues: Vec<ConsensusLivenessIssue>) -> Self {
+        Self::new(issues, None)
+    }
+}
+
+impl ViolationIssues {
+    fn new(issues: Vec<ConsensusLivenessIssue>, max_height_nodes: Option<String>) -> Self {
         let mut message = String::new();
+        if let Some(nodes) = &max_height_nodes {
+            message.push_str("max_height node(s): ");
+            message.push_str(nodes);
+            message.push('\n');
+        }
+
         for issue in &issues {
-            if !message.is_empty() {
-                message.push('\n');
-            }
             message.push_str("- ");
             message.push_str(&issue.to_string());
+            message.push('\n');
+        }
+        if message.ends_with('\n') {
+            message.pop();
         }
         Self { issues, message }
     }
+}
+
+fn format_max_height_nodes(samples: &[NodeSample], max_height: u64) -> Option<String> {
+    let mut leaders = samples.iter().filter(|sample| sample.height == max_height);
+    let first = leaders.next()?;
+
+    let mut rendered = vec![format!(
+        "{} (height={}, tip={:?})",
+        first.label, first.height, first.tip
+    )];
+    for sample in leaders {
+        rendered.push(format!(
+            "{} (height={}, tip={:?})",
+            sample.label, sample.height, sample.tip
+        ));
+    }
+
+    Some(rendered.join(", "))
 }
