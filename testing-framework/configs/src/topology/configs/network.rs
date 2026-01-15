@@ -1,14 +1,14 @@
 use std::time::Duration;
 
 use nomos_libp2p::{
-    IdentifySettings, KademliaSettings, Multiaddr, NatSettings, ed25519, gossipsub,
+    IdentifySettings, KademliaSettings, Multiaddr, NatSettings, Protocol, ed25519, gossipsub,
 };
 use nomos_node::config::network::serde::{BackendSettings, Config, SwarmConfig};
 use nomos_utils::net::get_available_udp_port;
 use testing_framework_env as tf_env;
 use thiserror::Error;
 
-use crate::node_address_from_port;
+use crate::{node_address_from_port, secret_key_to_peer_id};
 
 const PEER_RESPONSE_TIMEOUT: Duration = Duration::from_secs(60);
 
@@ -122,7 +122,7 @@ fn initial_peers_by_network_layout(
         Libp2pNetworkLayout::Star => {
             // First node is the hub - has no initial peers
             all_initial_peers.push(vec![]);
-            let first_addr = node_address_from_port(first_swarm.port);
+            let first_addr = node_address_with_peer(first_swarm);
 
             // All other nodes connect to the first node
             for _ in 1..swarm_configs.len() {
@@ -135,7 +135,7 @@ fn initial_peers_by_network_layout(
 
             // Each subsequent node connects to the previous one
             for i in 1..swarm_configs.len() {
-                let prev_addr = node_address_from_port(swarm_configs[i - 1].port);
+                let prev_addr = node_address_with_peer(&swarm_configs[i - 1]);
                 all_initial_peers.push(vec![prev_addr]);
             }
         }
@@ -144,7 +144,7 @@ fn initial_peers_by_network_layout(
             for i in 0..swarm_configs.len() {
                 let mut peers = vec![];
                 for swarm_config in swarm_configs.iter().take(i) {
-                    peers.push(node_address_from_port(swarm_config.port));
+                    peers.push(node_address_with_peer(swarm_config));
                 }
                 all_initial_peers.push(peers);
             }
@@ -152,4 +152,11 @@ fn initial_peers_by_network_layout(
     }
 
     all_initial_peers
+}
+
+fn node_address_with_peer(swarm_config: &SwarmConfig) -> Multiaddr {
+    let mut addr = node_address_from_port(swarm_config.port);
+    let peer_id = secret_key_to_peer_id(swarm_config.node_key.clone());
+    addr.push(Protocol::P2p(peer_id.into()));
+    addr
 }
