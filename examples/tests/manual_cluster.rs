@@ -1,11 +1,11 @@
-use std::{env, time::Duration};
+use std::time::Duration;
 
 use anyhow::Result;
 use testing_framework_core::{
     scenario::{PeerSelection, StartNodeOptions},
     topology::config::TopologyConfig,
 };
-use testing_framework_runner_local::ManualCluster;
+use testing_framework_runner_local::LocalDeployer;
 use tokio::time::sleep;
 use tracing_subscriber::fmt::try_init;
 
@@ -15,18 +15,12 @@ const MAX_HEIGHT_DIFF: u64 = 5;
 #[ignore = "run manually with `cargo test -p runner-examples -- --ignored manual_cluster_two_clusters_merge`"]
 async fn manual_cluster_two_clusters_merge() -> Result<()> {
     let _ = try_init();
-    let workspace_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("examples crate should live under the workspace root");
-    let circuits_dir = workspace_root.join("testing-framework/assets/stack/circuits");
-    unsafe {
-        env::set_var("LOGOS_BLOCKCHAIN_CIRCUITS", circuits_dir);
-    }
     // Required env vars (set on the command line when running this test):
     // - `POL_PROOF_DEV_MODE=true`
     // - `RUST_LOG=info` (optional)
     let config = TopologyConfig::with_node_numbers(2, 0);
-    let cluster = ManualCluster::from_config(config)?;
+    let deployer = LocalDeployer::new();
+    let cluster = deployer.manual_cluster(config)?;
     // Nodes are stopped automatically when the cluster is dropped.
 
     println!("starting validator a");

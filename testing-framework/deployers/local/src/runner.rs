@@ -7,6 +7,7 @@ use testing_framework_core::{
         RunContext, Runner, Scenario, ScenarioError, spawn_block_feed,
     },
     topology::{
+        config::TopologyConfig,
         deployment::{SpawnTopologyError, Topology},
         readiness::ReadinessError,
     },
@@ -14,7 +15,10 @@ use testing_framework_core::{
 use thiserror::Error;
 use tracing::{debug, info};
 
-use crate::node_control::{LocalDynamicNodes, LocalDynamicSeed};
+use crate::{
+    manual::{LocalManualCluster, ManualClusterError},
+    node_control::{LocalDynamicNodes, LocalDynamicSeed},
+};
 /// Spawns validators and executors as local processes, reusing the existing
 /// integration harness.
 #[derive(Clone)]
@@ -130,13 +134,25 @@ impl LocalDeployer {
         Self::default()
     }
 
-    async fn prepare_topology<C>(scenario: &Scenario<C>) -> Result<Topology, LocalDeployerError> {
+    /// Build a manual cluster using this deployer's local implementation.
+    pub fn manual_cluster(
+        &self,
+        config: TopologyConfig,
+    ) -> Result<LocalManualCluster, ManualClusterError> {
+        LocalManualCluster::from_config(config)
+    }
+
+    async fn prepare_topology<Caps>(
+        scenario: &Scenario<Caps>,
+    ) -> Result<Topology, LocalDeployerError> {
         let descriptors = scenario.topology();
+
         info!(
             validators = descriptors.validators().len(),
             executors = descriptors.executors().len(),
             "spawning local validators/executors"
         );
+
         let topology = descriptors
             .clone()
             .spawn_local()
@@ -149,6 +165,7 @@ impl LocalDeployer {
         })?;
 
         info!("local nodes are ready");
+
         Ok(topology)
     }
 }
@@ -161,6 +178,7 @@ impl Default for LocalDeployer {
 
 async fn wait_for_readiness(topology: &Topology) -> Result<(), ReadinessError> {
     info!("waiting for local network readiness");
+
     topology.wait_network_ready().await?;
     Ok(())
 }

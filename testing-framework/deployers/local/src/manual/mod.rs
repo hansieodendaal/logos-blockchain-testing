@@ -1,6 +1,7 @@
 use testing_framework_core::{
+    manual::ManualClusterHandle,
     nodes::ApiClient,
-    scenario::{StartNodeOptions, StartedNode},
+    scenario::{DynError, StartNodeOptions, StartedNode},
     topology::{
         config::{TopologyBuildError, TopologyBuilder, TopologyConfig},
         readiness::{ReadinessCheck, ReadinessError},
@@ -26,12 +27,12 @@ pub enum ManualClusterError {
 }
 
 /// Imperative, in-process cluster that can start nodes on demand.
-pub struct ManualCluster {
+pub struct LocalManualCluster {
     nodes: LocalDynamicNodes,
 }
 
-impl ManualCluster {
-    pub fn from_config(config: TopologyConfig) -> Result<Self, ManualClusterError> {
+impl LocalManualCluster {
+    pub(crate) fn from_config(config: TopologyConfig) -> Result<Self, ManualClusterError> {
         let builder = TopologyBuilder::new(config);
         let descriptors = builder
             .build()
@@ -100,8 +101,35 @@ impl ManualCluster {
     }
 }
 
-impl Drop for ManualCluster {
+impl Drop for LocalManualCluster {
     fn drop(&mut self) {
         self.stop_all();
+    }
+}
+
+#[async_trait::async_trait]
+impl ManualClusterHandle for LocalManualCluster {
+    async fn start_validator_with(
+        &self,
+        name: &str,
+        options: StartNodeOptions,
+    ) -> Result<StartedNode, DynError> {
+        self.start_validator_with(name, options)
+            .await
+            .map_err(|err| err.into())
+    }
+
+    async fn start_executor_with(
+        &self,
+        name: &str,
+        options: StartNodeOptions,
+    ) -> Result<StartedNode, DynError> {
+        self.start_executor_with(name, options)
+            .await
+            .map_err(|err| err.into())
+    }
+
+    async fn wait_network_ready(&self) -> Result<(), DynError> {
+        self.wait_network_ready().await.map_err(|err| err.into())
     }
 }
