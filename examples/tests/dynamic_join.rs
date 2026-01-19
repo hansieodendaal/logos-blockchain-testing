@@ -3,7 +3,7 @@ use std::time::Duration;
 use anyhow::Result;
 use async_trait::async_trait;
 use testing_framework_core::scenario::{
-    Deployer, DynError, RunContext, ScenarioBuilder, StartNodeOptions, Workload,
+    Deployer, DynError, PeerSelection, RunContext, ScenarioBuilder, StartNodeOptions, Workload,
 };
 use testing_framework_runner_local::LocalDeployer;
 use testing_framework_workflows::ScenarioBuilderExt;
@@ -84,7 +84,7 @@ impl Workload for JoinNodeWithPeersWorkload {
         sleep(START_DELAY).await;
 
         let options = StartNodeOptions {
-            peer_names: self.peers.clone(),
+            peers: PeerSelection::Named(self.peers.clone()),
         };
         let node = handle.start_validator_with(&self.name, options).await?;
         let client = node.api;

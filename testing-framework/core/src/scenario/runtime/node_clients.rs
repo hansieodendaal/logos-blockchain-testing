@@ -140,6 +140,12 @@ impl NodeClients {
         let mut guard = self.inner.write().expect("node clients lock poisoned");
         guard.executors.push(client);
     }
+
+    pub fn clear(&self) {
+        let mut guard = self.inner.write().expect("node clients lock poisoned");
+        guard.validators.clear();
+        guard.executors.clear();
+    }
 }
 
 pub struct ClusterClient<'a> {

@@ -12,8 +12,8 @@ mod workload;
 pub type DynError = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 pub use capabilities::{
-    NodeControlCapability, NodeControlHandle, ObservabilityCapability, RequiresNodeControl,
-    StartNodeOptions, StartedNode,
+    NodeControlCapability, NodeControlHandle, ObservabilityCapability, PeerSelection,
+    RequiresNodeControl, StartNodeOptions, StartedNode,
 };
 pub use definition::{
     Builder, Scenario, ScenarioBuildError, ScenarioBuilder, TopologyConfigurator,

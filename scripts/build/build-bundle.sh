@@ -327,10 +327,7 @@ build_bundle::prepare_circuits() {
 }
 
 build_bundle::build_binaries() {
-  FEATURES="testing"
-  if [ -n "${NOMOS_EXTRA_FEATURES:-}" ]; then
-    FEATURES="${FEATURES},${NOMOS_EXTRA_FEATURES}"
-  fi
+  BUILD_FEATURES_LABEL="all"
   echo "==> Building binaries (platform=${PLATFORM})"
   mkdir -p "${NODE_SRC}"
   (
@@ -362,13 +359,13 @@ build_bundle::build_binaries() {
       RUSTFLAGS='--cfg feature="pol-dev-mode"' NOMOS_CIRCUITS="${CIRCUITS_DIR}" \
         LOGOS_BLOCKCHAIN_CIRCUITS="${CIRCUITS_DIR}" \
         RUSTUP_TOOLCHAIN="${BUNDLE_RUSTUP_TOOLCHAIN}" \
-        cargo build --features "${FEATURES}" \
+        cargo build --all-features \
         -p logos-blockchain-node -p logos-blockchain-executor -p logos-blockchain-cli \
         --target-dir "${NODE_TARGET}"
     else
       RUSTFLAGS='--cfg feature="pol-dev-mode"' NOMOS_CIRCUITS="${CIRCUITS_DIR}" \
         LOGOS_BLOCKCHAIN_CIRCUITS="${CIRCUITS_DIR}" \
-        cargo build --features "${FEATURES}" \
+        cargo build --all-features \
         -p logos-blockchain-node -p logos-blockchain-executor -p logos-blockchain-cli \
         --target-dir "${NODE_TARGET}"
     fi
@@ -392,7 +389,7 @@ build_bundle::package_bundle() {
       echo "nomos_node_git_head=$(git -C "${NODE_SRC}" rev-parse HEAD 2>/dev/null || true)"
     fi
     echo "platform=${PLATFORM}"
-    echo "features=${FEATURES}"
+    echo "features=${BUILD_FEATURES_LABEL}"
   } > "${bundle_dir}/artifacts/nomos-bundle-meta.env"
 
   mkdir -p "$(dirname "${OUTPUT}")"
@@ -405,7 +402,7 @@ build_bundle::package_bundle() {
   fi
   echo "Bundle created at ${OUTPUT}"
 
-  if [[ "${FEATURES}" == *profiling* ]]; then
+  if [[ "${BUILD_FEATURES_LABEL}" == "all" ]] || [[ "${BUILD_FEATURES_LABEL}" == *profiling* ]]; then
     cat <<'EOF_PROF'
 Profiling endpoints (enabled by --features profiling):
   CPU pprof (SVG):   curl "http://<node-host>:8722/debug/pprof/profile?seconds=15&format=svg" -o profile.svg
