@@ -138,12 +138,20 @@ impl LocalDynamicNodes {
 
     #[must_use]
     pub fn node_client(&self, name: &str) -> Option<ApiClient> {
-        let state = self.state.lock().expect("local dynamic lock poisoned");
+        let state = self
+            .state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+
         state.clients_by_name.get(name).cloned()
     }
 
     pub fn stop_all(&self) {
-        let mut state = self.state.lock().expect("local dynamic lock poisoned");
+        let mut state = self
+            .state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+
         state.validators.clear();
         state.executors.clear();
         state.peer_ports.clone_from(&self.seed.peer_ports);
@@ -173,7 +181,10 @@ impl LocalDynamicNodes {
     }
 
     pub(crate) fn readiness_nodes(&self) -> Vec<ReadinessNode> {
-        let state = self.state.lock().expect("local dynamic lock poisoned");
+        let state = self
+            .state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
 
         let listen_ports = state
             .validators
@@ -245,7 +256,11 @@ impl LocalDynamicNodes {
         options: StartNodeOptions,
     ) -> Result<StartedNode, LocalDynamicError> {
         let (peer_ports, peer_ports_by_name, node_name, index) = {
-            let state = self.state.lock().expect("local dynamic lock poisoned");
+            let state = self
+                .state
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+
             let (index, role_label) = match role {
                 NodeRole::Validator => (state.validator_count, "validator"),
                 NodeRole::Executor => (state.executor_count, "executor"),
@@ -315,7 +330,11 @@ impl LocalDynamicNodes {
 
         self.node_clients.add_validator(client.clone());
 
-        let mut state = self.state.lock().expect("local dynamic lock poisoned");
+        let mut state = self
+            .state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+
         state.register_validator(node_name, network_port, client.clone(), node);
 
         Ok(client)
@@ -334,7 +353,11 @@ impl LocalDynamicNodes {
 
         self.node_clients.add_executor(client.clone());
 
-        let mut state = self.state.lock().expect("local dynamic lock poisoned");
+        let mut state = self
+            .state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+
         state.register_executor(node_name, network_port, client.clone(), node);
 
         Ok(client)
