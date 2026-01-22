@@ -18,10 +18,6 @@ const CHAOS_MAX_DELAY_SECS: u64 = 180;
 const CHAOS_COOLDOWN_SECS: u64 = 240;
 const CHAOS_DELAY_HEADROOM_SECS: u64 = 1;
 
-// DA Testing Constants
-const DA_CHANNEL_RATE: u64 = 1;
-const DA_BLOB_RATE: u64 = 1;
-
 #[tokio::main]
 async fn main() {
     runner_examples::defaults::init_node_log_dir_defaults(DeployerKind::Compose);
@@ -79,7 +75,6 @@ async fn run_compose_case(
     let mut plan = scenario
         .wallets(TOTAL_WALLETS)
         .transactions_with(|txs| txs.rate(MIXED_TXS_PER_BLOCK).users(TRANSACTION_WALLETS))
-        .da_with(|da| da.channel_rate(DA_CHANNEL_RATE).blob_rate(DA_BLOB_RATE))
         .with_run_duration(run_duration)
         .expect_consensus_liveness()
         .build()?;

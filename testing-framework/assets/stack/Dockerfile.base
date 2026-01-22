@@ -6,6 +6,7 @@ ARG VERSION
 ARG CIRCUITS_OVERRIDE
 ARG NOMOS_NODE_REV
 ARG CIRCUITS_PLATFORM
+ARG RAPIDSNARK_FORCE_REBUILD
 
 # ===========================
 # BUILD IMAGE
@@ -17,6 +18,7 @@ ARG VERSION
 ARG CIRCUITS_OVERRIDE
 ARG NOMOS_NODE_REV
 ARG CIRCUITS_PLATFORM
+ARG RAPIDSNARK_FORCE_REBUILD
 
 LABEL maintainer="augustinas@status.im" \
     source="https://github.com/logos-co/nomos-node" \
@@ -28,6 +30,7 @@ COPY . .
 # Reduce debug artifact size.
 ENV CARGO_PROFILE_DEV_DEBUG=0
 ENV NOMOS_NODE_REV=${NOMOS_NODE_REV}
+ENV RAPIDSNARK_FORCE_REBUILD=${RAPIDSNARK_FORCE_REBUILD}
 
 # Install dependencies needed for building RocksDB and for circuit tooling.
 RUN apt-get update && apt-get install -yq \
@@ -39,7 +42,7 @@ RUN chmod +x \
       /workspace/testing-framework/assets/stack/scripts/docker/prepare_binaries.sh \
       /workspace/testing-framework/assets/stack/scripts/docker/build_cfgsync.sh \
       /workspace/scripts/build/build-rapidsnark.sh \
-      /workspace/scripts/setup/setup-nomos-circuits.sh \
+      /workspace/scripts/setup/setup-logos-blockchain-circuits.sh \
     || true
 
 RUN /workspace/testing-framework/assets/stack/scripts/docker/prepare_circuits.sh

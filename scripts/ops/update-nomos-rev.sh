@@ -101,12 +101,12 @@ cargo_toml = root / "Cargo.toml"
 txt = cargo_toml.read_text()
 txt = txt.replace("\\n", "\n")
 txt = re.sub(
-    r'(?ms)^\[patch\."https://github\.com/logos-co/logos-blockchain-node"\].*?(?=^\[|\Z)',
+    r'(?ms)^\[patch\."https://github\.com/logos-co/nomos-node"\].*?(?=^\[|\Z)',
     "",
     txt,
 )
 txt = re.sub(
-    r'(git = "https://github\.com/logos-co/logos-blockchain-node\.git", rev = ")[^"]+(")',
+    r'(git = "https://github\.com/logos-co/nomos-node\.git", rev = ")[^"]+(")',
     r"\g<1>" + rev + r"\2",
     txt,
 )
@@ -213,7 +213,7 @@ cargo_toml = root / "Cargo.toml"
 txt = cargo_toml.read_text()
 txt = txt.replace("\\n", "\n")
 txt = re.sub(
-    r'(?ms)^\[patch\."https://github\.com/logos-co/logos-blockchain-node"\].*?(?=^\[|\Z)',
+    r'(?ms)^\[patch\."https://github\.com/logos-co/nomos-node"\].*?(?=^\[|\Z)',
     "",
     txt,
 )

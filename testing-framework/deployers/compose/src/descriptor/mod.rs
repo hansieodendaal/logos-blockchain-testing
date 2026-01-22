@@ -192,7 +192,7 @@ fn base_environment(cfgsync_port: u16, use_kzg_mount: bool) -> Vec<EnvEntry> {
         EnvEntry::new("RUST_LOG", rust_log),
         EnvEntry::new("NOMOS_LOG_LEVEL", nomos_log_level),
         EnvEntry::new("NOMOS_TIME_BACKEND", time_backend),
-        EnvEntry::new("NOMOS_KZGRS_PARAMS_PATH", kzg_path),
+        EnvEntry::new("LOGOS_BLOCKCHAIN_KZGRS_PARAMS_PATH", kzg_path),
         EnvEntry::new(
             "CFG_SERVER_ADDR",
             format!("http://host.docker.internal:{cfgsync_port}"),

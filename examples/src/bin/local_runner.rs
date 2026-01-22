@@ -9,7 +9,6 @@ use tracing::{info, warn};
 const MIXED_TXS_PER_BLOCK: u64 = 5;
 const TOTAL_WALLETS: usize = 1000;
 const TRANSACTION_WALLETS: usize = 500;
-const DA_BLOB_RATE: u64 = 3;
 const SMOKE_RUN_SECS_MAX: u64 = 30;
 
 #[tokio::main]
@@ -57,7 +56,6 @@ async fn run_local_case(validators: usize, executors: usize, run_duration: Durat
     } else {
         scenario
             .transactions_with(|txs| txs.rate(MIXED_TXS_PER_BLOCK).users(TRANSACTION_WALLETS))
-            .da_with(|da| da.blob_rate(DA_BLOB_RATE))
             .expect_consensus_liveness()
     };
 

@@ -436,8 +436,8 @@ run_examples::prepare_bundles() {
   HOST_TAR="${ROOT_DIR}/.tmp/nomos-binaries-host-${VERSION}.tar.gz"
   LINUX_TAR="${ROOT_DIR}/.tmp/nomos-binaries-linux-${VERSION}.tar.gz"
 
-  if [ -n "${NOMOS_NODE_BIN:-}" ] && [ -x "${NOMOS_NODE_BIN}" ] && [ -n "${NOMOS_EXECUTOR_BIN:-}" ] && [ -x "${NOMOS_EXECUTOR_BIN}" ]; then
-    echo "==> Using pre-specified host binaries (NOMOS_NODE_BIN/NOMOS_EXECUTOR_BIN); skipping tarball restore"
+  if [ -n "${LOGOS_BLOCKCHAIN_NODE_BIN:-}" ] && [ -x "${LOGOS_BLOCKCHAIN_NODE_BIN}" ] && [ -n "${LOGOS_BLOCKCHAIN_EXECUTOR_BIN:-}" ] && [ -x "${LOGOS_BLOCKCHAIN_EXECUTOR_BIN}" ]; then
+    echo "==> Using pre-specified host binaries (LOGOS_BLOCKCHAIN_NODE_BIN/LOGOS_BLOCKCHAIN_EXECUTOR_BIN); skipping tarball restore"
     return 0
   fi
 
@@ -508,7 +508,7 @@ run_examples::validate_restored_bundle() {
     common::die "KZG params missing at ${KZG_HOST_PATH}; ensure the tarball contains circuits."
   fi
 
-  if [ "${MODE}" = "host" ] && ! { [ -n "${NOMOS_NODE_BIN:-}" ] && [ -x "${NOMOS_NODE_BIN:-}" ] && [ -n "${NOMOS_EXECUTOR_BIN:-}" ] && [ -x "${NOMOS_EXECUTOR_BIN:-}" ]; }; then
+  if [ "${MODE}" = "host" ] && ! { [ -n "${LOGOS_BLOCKCHAIN_NODE_BIN:-}" ] && [ -x "${LOGOS_BLOCKCHAIN_NODE_BIN:-}" ] && [ -n "${LOGOS_BLOCKCHAIN_EXECUTOR_BIN:-}" ] && [ -x "${LOGOS_BLOCKCHAIN_EXECUTOR_BIN:-}" ]; }; then
     local tar_node tar_exec
     tar_node="${RESTORED_BIN_DIR:-${ROOT_DIR}/testing-framework/assets/stack/bin}/logos-blockchain-node"
     tar_exec="${RESTORED_BIN_DIR:-${ROOT_DIR}/testing-framework/assets/stack/bin}/logos-blockchain-executor"
@@ -519,9 +519,9 @@ run_examples::validate_restored_bundle() {
       "Restored executables do not match host architecture; provide a host-compatible binaries tarball."
 
     echo "==> Using restored host binaries from tarball"
-    NOMOS_NODE_BIN="${tar_node}"
-    NOMOS_EXECUTOR_BIN="${tar_exec}"
-    export NOMOS_NODE_BIN NOMOS_EXECUTOR_BIN
+    LOGOS_BLOCKCHAIN_NODE_BIN="${tar_node}"
+    LOGOS_BLOCKCHAIN_EXECUTOR_BIN="${tar_exec}"
+    export LOGOS_BLOCKCHAIN_NODE_BIN LOGOS_BLOCKCHAIN_EXECUTOR_BIN
   fi
 }
 
@@ -546,10 +546,24 @@ run_examples::ensure_compose_circuits_platform_default() {
   arch="$(uname -m)"
   case "${arch}" in
     x86_64) COMPOSE_CIRCUITS_PLATFORM="linux-x86_64" ;;
-    arm64|aarch64) COMPOSE_CIRCUITS_PLATFORM="linux-aarch64" ;;
+    arm64|aarch64) COMPOSE_CIRCUITS_PLATFORM="linux-x86_64" ;;
     *) COMPOSE_CIRCUITS_PLATFORM="linux-x86_64" ;;
   esac
   export COMPOSE_CIRCUITS_PLATFORM
+}
+
+run_examples::maybe_set_docker_platform() {
+  if [ "${MODE}" != "compose" ] || [ -n "${DOCKER_DEFAULT_PLATFORM:-}" ]; then
+    return 0
+  fi
+
+  case "${COMPOSE_CIRCUITS_PLATFORM:-}" in
+    linux-x86_64) DOCKER_DEFAULT_PLATFORM="linux/amd64" ;;
+    linux-aarch64) DOCKER_DEFAULT_PLATFORM="linux/arm64" ;;
+    *) return 0 ;;
+  esac
+
+  export DOCKER_DEFAULT_PLATFORM
 }
 
 run_examples::run() {
@@ -575,9 +589,9 @@ run_examples::run() {
   NOMOS_TESTNET_IMAGE="${IMAGE}" \
   NOMOS_CIRCUITS="${HOST_BUNDLE_PATH}" \
   LOGOS_BLOCKCHAIN_CIRCUITS="${HOST_BUNDLE_PATH}" \
-  NOMOS_KZGRS_PARAMS_PATH="${kzg_path}" \
-  NOMOS_NODE_BIN="${NOMOS_NODE_BIN:-}" \
-  NOMOS_EXECUTOR_BIN="${NOMOS_EXECUTOR_BIN:-}" \
+  LOGOS_BLOCKCHAIN_KZGRS_PARAMS_PATH="${kzg_path}" \
+  LOGOS_BLOCKCHAIN_NODE_BIN="${LOGOS_BLOCKCHAIN_NODE_BIN:-}" \
+  LOGOS_BLOCKCHAIN_EXECUTOR_BIN="${LOGOS_BLOCKCHAIN_EXECUTOR_BIN:-}" \
   COMPOSE_CIRCUITS_PLATFORM="${COMPOSE_CIRCUITS_PLATFORM:-}" \
     cargo run -p runner-examples --bin "${BIN}"
 }
@@ -593,10 +607,11 @@ run_examples::main() {
 
   SETUP_OUT="$(common::tmpfile nomos-setup-output.XXXXXX)"
 
+  run_examples::ensure_compose_circuits_platform_default
+  run_examples::maybe_set_docker_platform
   run_examples::maybe_rebuild_image
   run_examples::maybe_restore_host_after_image
   run_examples::validate_restored_bundle
-  run_examples::ensure_compose_circuits_platform_default
   run_examples::run
 }
 

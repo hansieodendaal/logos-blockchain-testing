@@ -80,7 +80,7 @@ fn resolve_global_params_path() -> String {
             warn!(
                 ?err,
                 path = %params_path.display(),
-                "falling back to non-canonical KZG params path; set NOMOS_KZGRS_PARAMS_PATH to override"
+                "falling back to non-canonical KZG params path; set LOGOS_BLOCKCHAIN_KZGRS_PARAMS_PATH to override"
             );
             params_path.to_string_lossy().to_string()
         }

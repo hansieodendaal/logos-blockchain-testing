@@ -150,7 +150,7 @@ This project is part of the Logos blockchain implementation.
 
 - **Documentation**: https://logos-blockchain.github.io/logos-blockchain-testing/
 - **Logos Project**: https://github.com/logos-co
-- **Logos Node (repo: nomos-node)**: https://github.com/logos-co/nomos-node
+- **Logos Node (repo: logos-blockchain-node)**: https://github.com/logos-co/logos-blockchain-node
 
 ## Support
 

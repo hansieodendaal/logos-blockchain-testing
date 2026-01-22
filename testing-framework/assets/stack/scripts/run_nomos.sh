@@ -38,7 +38,7 @@ check_binary_arch() {
 }
 
 bin_path="$(bin_for_role "$role")"
-check_binary_arch "$bin_path" "nomos-${role}"
+check_binary_arch "$bin_path" "logos-blockchain-${role}"
 
 KZG_CONTAINER_PATH="${NOMOS_KZG_CONTAINER_PATH:-/kzgrs_test_params/kzgrs_test_params}"
 host_identifier_default="${role}-$(hostname -i)"
@@ -48,7 +48,7 @@ export CFG_FILE_PATH="/config.yaml" \
        CFG_HOST_IP=$(hostname -i) \
        CFG_HOST_KIND="${CFG_HOST_KIND:-$role}" \
        CFG_HOST_IDENTIFIER="${CFG_HOST_IDENTIFIER:-$host_identifier_default}" \
-       NOMOS_KZGRS_PARAMS_PATH="${NOMOS_KZGRS_PARAMS_PATH:-${KZG_CONTAINER_PATH}}" \
+       LOGOS_BLOCKCHAIN_KZGRS_PARAMS_PATH="${LOGOS_BLOCKCHAIN_KZGRS_PARAMS_PATH:-${KZG_CONTAINER_PATH}}" \
        NOMOS_TIME_BACKEND="${NOMOS_TIME_BACKEND:-monotonic}" \
        LOG_LEVEL="${LOG_LEVEL:-INFO}" \
        POL_PROOF_DEV_MODE="${POL_PROOF_DEV_MODE:-true}"

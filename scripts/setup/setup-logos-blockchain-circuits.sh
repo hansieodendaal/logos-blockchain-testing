@@ -7,16 +7,16 @@ fi
 
 # Setup script for logos-blockchain-circuits
 #
-# Usage: scripts/setup/setup-nomos-circuits.sh [VERSION] [INSTALL_DIR]
+# Usage: scripts/setup/setup-logos-blockchain-circuits.sh [VERSION] [INSTALL_DIR]
 #
 # Arguments:
 #   VERSION      Optional. Version to install (default: v0.3.2)
 #   INSTALL_DIR  Optional. Installation directory (default: $HOME/.logos-blockchain-circuits)
 #
 # Examples:
-#   scripts/setup/setup-nomos-circuits.sh
-#   scripts/setup/setup-nomos-circuits.sh v0.3.2
-#   scripts/setup/setup-nomos-circuits.sh v0.3.2 /opt/circuits
+#   scripts/setup/setup-logos-blockchain-circuits.sh
+#   scripts/setup/setup-logos-blockchain-circuits.sh v0.3.2
+#   scripts/setup/setup-logos-blockchain-circuits.sh v0.3.2 /opt/circuits
 
 DEFAULT_CIRCUITS_VERSION="v0.3.2"
 DEFAULT_INSTALL_DIR="${HOME}/.logos-blockchain-circuits"
@@ -88,27 +88,51 @@ check_existing_installation() {
 
 download_release() {
   local platform="$1"
-  local artifact="logos-blockchain-circuits-${VERSION}-${platform}.tar.gz"
-  local url="https://github.com/${REPO}/releases/download/${VERSION}/${artifact}"
+  local artifact=""
+  local url=""
   local temp_dir
   temp_dir="$(mktemp -d)"
 
-  print_info "Downloading logos-blockchain-circuits ${VERSION} for ${platform}..."
-  print_info "URL: ${url}"
+  for attempt in 1 2; do
+    artifact="logos-blockchain-circuits-${VERSION}-${platform}.tar.gz"
+    url="https://github.com/${REPO}/releases/download/${VERSION}/${artifact}"
 
-  local curl_cmd="curl -L"
-  if [ -n "${GITHUB_TOKEN:-}" ]; then
-    curl_cmd="$curl_cmd --header 'authorization: Bearer ${GITHUB_TOKEN}'"
-  fi
-  curl_cmd="$curl_cmd -o ${temp_dir}/${artifact} ${url}"
+    print_info "Downloading logos-blockchain-circuits ${VERSION} for ${platform}..."
+    print_info "URL: ${url}"
 
-  if ! eval "${curl_cmd}"; then
+    local curl_cmd="curl -L"
+    if [ -n "${GITHUB_TOKEN:-}" ]; then
+      curl_cmd="$curl_cmd --header 'authorization: Bearer ${GITHUB_TOKEN}'"
+    fi
+    curl_cmd="$curl_cmd -o ${temp_dir}/${artifact} ${url}"
+
+    if eval "${curl_cmd}"; then
+      if tar -tzf "${temp_dir}/${artifact}" >/dev/null 2>&1; then
+        break
+      fi
+      if [ "${platform}" = "linux-aarch64" ] || [ "${platform}" = "linux-arm64" ]; then
+        print_warning "Downloaded artifact is not a valid tar.gz; falling back to linux-x86_64"
+        rm -f "${temp_dir}/${artifact}"
+        platform="linux-x86_64"
+        continue
+      fi
+      print_error "Downloaded artifact is not a valid tar.gz for ${platform}"
+      rm -rf "${temp_dir}"
+      exit 1
+    fi
+
+    if [ "${attempt}" -eq 1 ] && { [ "${platform}" = "linux-aarch64" ] || [ "${platform}" = "linux-arm64" ]; }; then
+      print_warning "No linux-aarch64 assets found; falling back to linux-x86_64"
+      platform="linux-x86_64"
+      continue
+    fi
+
     print_error "Failed to download release artifact"
     print_error "Please check that version ${VERSION} exists for platform ${platform}"
     print_error "Available releases: https://github.com/${REPO}/releases"
     rm -rf "${temp_dir}"
     exit 1
-  fi
+  done
 
   print_success "Download complete"
 

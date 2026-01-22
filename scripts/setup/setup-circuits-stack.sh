@@ -25,8 +25,8 @@ witness generators).
 
 Env overrides:
   STACK_DIR   Where to place the Linux bundle (default: testing-framework/assets/stack/kzgrs_test_params)
-  HOST_DIR    Where to place the host bundle (default: .tmp/nomos-circuits-host)
-  LINUX_STAGE_DIR  Optional staging dir for the Linux bundle (default: .tmp/nomos-circuits-linux)
+  HOST_DIR    Where to place the host bundle (default: .tmp/logos-blockchain-circuits-host)
+  LINUX_STAGE_DIR  Optional staging dir for the Linux bundle (default: .tmp/logos-blockchain-circuits-linux)
   NOMOS_CIRCUITS_PLATFORM            Force host platform (e.g., macos-aarch64)
   NOMOS_CIRCUITS_REBUILD_RAPIDSNARK  Set to 1 to force rebuild (host bundle only)
 EOF
@@ -76,7 +76,7 @@ setup_circuits_stack::fetch_bundle() {
 
   if ! NOMOS_CIRCUITS_PLATFORM="${platform}" \
     NOMOS_CIRCUITS_REBUILD_RAPIDSNARK="${rebuild}" \
-    "${ROOT_DIR}/scripts/setup/setup-nomos-circuits.sh" "${VERSION}" "${temp_dest}"; then
+    "${ROOT_DIR}/scripts/setup/setup-logos-blockchain-circuits.sh" "${VERSION}" "${temp_dest}"; then
     rm -rf "${temp_dest}"
     return 1
   fi
@@ -89,7 +89,7 @@ setup_circuits_stack::fetch_bundle() {
 setup_circuits_stack::fetch_kzg_params() {
   local dest_dir="$1"
   local dest_file="${dest_dir}/${KZG_FILE}"
-  local url="${RAW_GITHUB_BASE_URL}/logos-co/logos-blockchain-node/${NOMOS_NODE_REV}/${DEFAULT_KZG_PARAMS_RELPATH}"
+  local url="${RAW_GITHUB_BASE_URL}/logos-co/nomos-node/${NOMOS_NODE_REV}/${DEFAULT_KZG_PARAMS_RELPATH}"
 
   echo "Fetching KZG parameters from ${url}"
   curl -fsSL "${url}" -o "${dest_file}"
@@ -106,8 +106,8 @@ setup_circuits_stack::load_env() {
 
   KZG_DIR_REL="${NOMOS_KZG_DIR_REL:-${DEFAULT_KZG_DIR_REL}}"
   KZG_FILE="${NOMOS_KZG_FILE:-${DEFAULT_KZG_FILE}}"
-  HOST_DIR_REL_DEFAULT="${NOMOS_CIRCUITS_HOST_DIR_REL:-.tmp/nomos-circuits-host}"
-  LINUX_DIR_REL_DEFAULT="${NOMOS_CIRCUITS_LINUX_DIR_REL:-.tmp/nomos-circuits-linux}"
+  HOST_DIR_REL_DEFAULT="${NOMOS_CIRCUITS_HOST_DIR_REL:-.tmp/logos-blockchain-circuits-host}"
+  LINUX_DIR_REL_DEFAULT="${NOMOS_CIRCUITS_LINUX_DIR_REL:-.tmp/logos-blockchain-circuits-linux}"
 
   VERSION="${VERSION:-${DEFAULT_CIRCUITS_VERSION}}"
   STACK_DIR="${STACK_DIR:-${ROOT_DIR}/${KZG_DIR_REL}}"

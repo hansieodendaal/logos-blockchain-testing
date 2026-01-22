@@ -32,7 +32,7 @@ bin_matches_arch() {
 }
 
 if have_prebuilt && bin_matches_arch; then
-  echo "Using prebuilt nomos binaries from testing-framework/assets/stack/bin"
+  echo "Using prebuilt logos-blockchain binaries from testing-framework/assets/stack/bin"
   cp testing-framework/assets/stack/bin/logos-blockchain-node /workspace/artifacts/logos-blockchain-node
   cp testing-framework/assets/stack/bin/logos-blockchain-executor /workspace/artifacts/logos-blockchain-executor
   cp testing-framework/assets/stack/bin/logos-blockchain-cli /workspace/artifacts/logos-blockchain-cli
@@ -40,18 +40,28 @@ if have_prebuilt && bin_matches_arch; then
 fi
 
 if have_prebuilt; then
-  echo "Prebuilt nomos binaries do not match target architecture (${TARGET_ARCH}); rebuilding from source"
+  echo "Prebuilt logos-blockchain binaries do not match target architecture (${TARGET_ARCH}); rebuilding from source"
 else
-  echo "Prebuilt nomos binaries missing; building from source"
+  echo "Prebuilt logos-blockchain binaries missing; building from source"
 fi
 
-echo "Building nomos binaries from source (rev ${NOMOS_NODE_REV})"
+echo "Building logos-blockchain binaries from source (rev ${NOMOS_NODE_REV})"
 git clone https://github.com/logos-co/nomos-node.git /tmp/nomos-node
-cd /tmp/logos-blockchain-node
+cd /tmp/nomos-node
 git fetch --depth 1 origin "${NOMOS_NODE_REV}"
 git checkout "${NOMOS_NODE_REV}"
 git reset --hard
 git clean -fdx
+
+# Enable real verification keys when available.
+if [ -f "/opt/circuits/zksign/verification_key.json" ] \
+  || [ -f "/opt/circuits/pol/verification_key.json" ] \
+  || [ -f "/opt/circuits/poq/verification_key.json" ] \
+  || [ -f "/opt/circuits/poc/verification_key.json" ]; then
+  export CARGO_FEATURE_BUILD_VERIFICATION_KEY=1
+else
+  unset CARGO_FEATURE_BUILD_VERIFICATION_KEY
+fi
 
 # Enable pol-dev-mode via cfg to let POL_PROOF_DEV_MODE short-circuit proofs in tests.
 RUSTFLAGS='--cfg feature="pol-dev-mode"' NOMOS_CIRCUITS=/opt/circuits \
@@ -59,8 +69,8 @@ RUSTFLAGS='--cfg feature="pol-dev-mode"' NOMOS_CIRCUITS=/opt/circuits \
   cargo build --features "testing" \
   -p logos-blockchain-node -p logos-blockchain-executor -p logos-blockchain-cli
 
-cp /tmp/logos-blockchain-node/target/debug/logos-blockchain-node /workspace/artifacts/logos-blockchain-node
-cp /tmp/logos-blockchain-node/target/debug/logos-blockchain-executor /workspace/artifacts/logos-blockchain-executor
-cp /tmp/logos-blockchain-node/target/debug/logos-blockchain-cli /workspace/artifacts/logos-blockchain-cli
+cp /tmp/nomos-node/target/debug/logos-blockchain-node /workspace/artifacts/logos-blockchain-node
+cp /tmp/nomos-node/target/debug/logos-blockchain-executor /workspace/artifacts/logos-blockchain-executor
+cp /tmp/nomos-node/target/debug/logos-blockchain-cli /workspace/artifacts/logos-blockchain-cli
 
-rm -rf /tmp/logos-blockchain-node/target/debug/incremental
+rm -rf /tmp/nomos-node/target/debug/incremental

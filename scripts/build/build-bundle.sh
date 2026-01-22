@@ -264,10 +264,10 @@ build_bundle::maybe_run_linux_build_in_docker() {
     -e NOMOS_NODE_REV="${NOMOS_NODE_REV}" \
     -e NOMOS_NODE_PATH="${node_path_env}" \
     -e NOMOS_BUNDLE_DOCKER_PLATFORM="${DOCKER_PLATFORM}" \
-    -e NOMOS_CIRCUITS="/workspace/.tmp/nomos-circuits-linux" \
-    -e LOGOS_BLOCKCHAIN_CIRCUITS="/workspace/.tmp/nomos-circuits-linux" \
-    -e STACK_DIR="/workspace/.tmp/nomos-circuits-linux" \
-    -e HOST_DIR="/workspace/.tmp/nomos-circuits-linux" \
+    -e NOMOS_CIRCUITS="/workspace/.tmp/logos-blockchain-circuits-linux" \
+    -e LOGOS_BLOCKCHAIN_CIRCUITS="/workspace/.tmp/logos-blockchain-circuits-linux" \
+    -e STACK_DIR="/workspace/.tmp/logos-blockchain-circuits-linux" \
+    -e HOST_DIR="/workspace/.tmp/logos-blockchain-circuits-linux" \
     -e NOMOS_EXTRA_FEATURES="${NOMOS_EXTRA_FEATURES:-}" \
     -e BUNDLE_IN_CONTAINER=1 \
     -e CARGO_HOME=/workspace/.tmp/cargo-linux \
@@ -286,10 +286,10 @@ build_bundle::maybe_run_linux_build_in_docker() {
 build_bundle::prepare_circuits() {
   echo "==> Preparing circuits (version ${VERSION})"
   if [ "${PLATFORM}" = "host" ]; then
-    CIRCUITS_DIR="${ROOT_DIR}/.tmp/nomos-circuits-host"
+    CIRCUITS_DIR="${ROOT_DIR}/.tmp/logos-blockchain-circuits-host"
     NODE_TARGET="${ROOT_DIR}/.tmp/logos-blockchain-node-host-target"
   else
-    CIRCUITS_DIR="${ROOT_DIR}/.tmp/nomos-circuits-linux"
+    CIRCUITS_DIR="${ROOT_DIR}/.tmp/logos-blockchain-circuits-linux"
     # When building Linux bundles in Docker, avoid reusing the same target dir
     # across different container architectures (e.g. linux/arm64 vs linux/amd64),
     # as the native-host `target/debug` layout would otherwise get mixed.

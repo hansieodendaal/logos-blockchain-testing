@@ -67,7 +67,10 @@ check_linux_exec() {
 check_linux_exec /opt/circuits/zksign/witness_generator
 check_linux_exec /opt/circuits/pol/witness_generator
 
-if [ -f "/opt/circuits/prover" ]; then
+if [ "${RAPIDSNARK_FORCE_REBUILD:-0}" = "1" ]; then
+  echo "Forcing rapidsnark rebuild for /opt/circuits"
+  scripts/build/build-rapidsnark.sh /opt/circuits
+elif [ -f "/opt/circuits/prover" ]; then
   PROVER_INFO="$(file -b /opt/circuits/prover || true)"
   case "${TARGET_ARCH}" in
     x86_64) EXPECT_ARCH="x86-64" ;;
@@ -86,5 +89,5 @@ if [ "${require_linux_execs}" -eq 1 ] || [ ! -f "/opt/circuits/pol/verification_
   NOMOS_CIRCUITS_PLATFORM="${CIRCUITS_PLATFORM}" \
   NOMOS_CIRCUITS_REBUILD_RAPIDSNARK=1 \
   RAPIDSNARK_BUILD_GMP=1 \
-    scripts/setup/setup-nomos-circuits.sh "${VERSION}" "/opt/circuits"
+    scripts/setup/setup-logos-blockchain-circuits.sh "${VERSION}" "/opt/circuits"
 fi

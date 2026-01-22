@@ -12,7 +12,6 @@ use tracing::{info, warn};
 const MIXED_TXS_PER_BLOCK: u64 = 2;
 const TOTAL_WALLETS: usize = 200;
 const TRANSACTION_WALLETS: usize = 50;
-const DA_BLOB_RATE: u64 = 1;
 
 #[tokio::main]
 async fn main() {
@@ -43,7 +42,6 @@ async fn run_k8s_case(validators: usize, executors: usize, run_duration: Duratio
     .with_capabilities(ObservabilityCapability::default())
     .wallets(TOTAL_WALLETS)
     .transactions_with(|txs| txs.rate(MIXED_TXS_PER_BLOCK).users(TRANSACTION_WALLETS))
-    .da_with(|da| da.blob_rate(DA_BLOB_RATE).headroom_percent(0))
     .with_run_duration(run_duration)
     .expect_consensus_liveness();
 

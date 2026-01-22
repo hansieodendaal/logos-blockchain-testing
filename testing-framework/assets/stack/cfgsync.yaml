@@ -5,6 +5,8 @@ timeout: 10
 # ConsensusConfig related parameters
 security_param: 10
 active_slot_coeff: 0.9
+wallet:
+  accounts: []
 
 # DaConfig related parameters
 subnetwork_size: 2

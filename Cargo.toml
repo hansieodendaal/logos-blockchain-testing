@@ -15,7 +15,7 @@ resolver = "2"
 
 [workspace.package]
 categories  = []
-description = "Logos testing framework workspace (split out from nomos-node)"
+description = "Logos testing framework workspace (split out from logos-blockchain-node)"
 edition     = "2024"
 keywords    = ["framework", "nomos", "testing"]
 license     = "MIT OR Apache-2.0"

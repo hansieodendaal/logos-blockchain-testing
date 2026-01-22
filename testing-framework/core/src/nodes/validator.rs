@@ -22,7 +22,7 @@ const BIN_PATH: &str = "target/debug/logos-blockchain-node";
 
 fn binary_path() -> PathBuf {
     let cfg = BinaryConfig {
-        env_var: "NOMOS_NODE_BIN",
+        env_var: "LOGOS_BLOCKCHAIN_NODE_BIN",
         binary_name: "logos-blockchain-node",
         fallback_path: BIN_PATH,
         shared_bin_subpath: "../assets/stack/bin/logos-blockchain-node",

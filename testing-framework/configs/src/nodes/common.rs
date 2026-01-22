@@ -223,17 +223,30 @@ pub(crate) fn testing_http_config(
 }
 
 pub(crate) fn wallet_settings(config: &GeneralConfig) -> WalletServiceSettings {
-    WalletServiceSettings {
-        known_keys: {
-            let mut keys = HashSet::from_iter([config.consensus_config.leader_config.pk]);
-            keys.extend(
-                config
-                    .consensus_config
-                    .wallet_accounts
-                    .iter()
-                    .map(crate::topology::configs::wallet::WalletAccount::public_key),
-            );
-            keys
-        },
+    wallet_settings_with_leader(config, true)
+}
+
+pub(crate) fn wallet_settings_for_executor(config: &GeneralConfig) -> WalletServiceSettings {
+    wallet_settings_with_leader(config, false)
+}
+
+fn wallet_settings_with_leader(
+    config: &GeneralConfig,
+    include_leader: bool,
+) -> WalletServiceSettings {
+    let mut keys = HashSet::new();
+
+    if include_leader {
+        keys.insert(config.consensus_config.leader_config.pk);
     }
+
+    keys.extend(
+        config
+            .consensus_config
+            .wallet_accounts
+            .iter()
+            .map(crate::topology::configs::wallet::WalletAccount::public_key),
+    );
+
+    WalletServiceSettings { known_keys: keys }
 }

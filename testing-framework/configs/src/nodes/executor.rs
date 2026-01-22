@@ -20,7 +20,7 @@ use crate::{
         common::{
             cryptarchia_config, cryptarchia_deployment, da_sampling_config, da_verifier_config,
             http_config, mempool_config, mempool_deployment, testing_http_config, time_config,
-            time_deployment, tracing_settings, wallet_settings,
+            time_deployment, tracing_settings, wallet_settings_for_executor,
         },
     },
     timeouts,
@@ -63,7 +63,7 @@ pub fn create_executor_config(config: GeneralConfig) -> ExecutorConfig {
         time: time_config(&config),
         mempool: mempool_config(),
         sdp: SdpSettings { declaration: None },
-        wallet: wallet_settings(&config),
+        wallet: wallet_settings_for_executor(&config),
         key_management: config.kms_config.clone(),
         testing_http: testing_http_config(&config),
     }

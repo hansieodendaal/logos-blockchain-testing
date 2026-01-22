@@ -187,6 +187,17 @@ build_test_image::docker_build() {
 
   [ -f "${BASE_DOCKERFILE_PATH}" ] || build_test_image::fail "Base Dockerfile not found: ${BASE_DOCKERFILE_PATH}"
 
+  local host_platform=""
+  local target_platform=""
+  case "$(uname -m)" in
+    x86_64) host_platform="linux/amd64" ;;
+    arm64|aarch64) host_platform="linux/arm64" ;;
+  esac
+  case "${CIRCUITS_PLATFORM}" in
+    linux-x86_64) target_platform="linux/amd64" ;;
+    linux-aarch64) target_platform="linux/arm64" ;;
+  esac
+
   local -a base_build_args=(
     -f "${BASE_DOCKERFILE_PATH}"
     -t "${BASE_IMAGE_TAG}"
@@ -198,6 +209,10 @@ build_test_image::docker_build() {
 
   if [ -n "${CIRCUITS_OVERRIDE}" ]; then
     base_build_args+=(--build-arg "CIRCUITS_OVERRIDE=${CIRCUITS_OVERRIDE}")
+  fi
+  if [ -n "${host_platform}" ] && [ -n "${target_platform}" ] && [ "${host_platform}" != "${target_platform}" ]; then
+    base_build_args+=(--platform "${target_platform}")
+    base_build_args+=(--build-arg "RAPIDSNARK_FORCE_REBUILD=1")
   fi
 
   printf "Running:"
@@ -211,6 +226,9 @@ build_test_image::docker_build() {
     --build-arg "BASE_IMAGE=${BASE_IMAGE_TAG}"
     "${ROOT_DIR}"
   )
+  if [ -n "${host_platform}" ] && [ -n "${target_platform}" ] && [ "${host_platform}" != "${target_platform}" ]; then
+    final_build_args+=(--platform "${target_platform}")
+  fi
 
   printf "Running:"
   printf " %q" docker build "${final_build_args[@]}"

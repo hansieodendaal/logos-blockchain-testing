@@ -97,7 +97,7 @@ checks::print_kzg_params() {
   if [ -f "${host_kzg_path}" ]; then
     checks::ok "KZG params file exists"
   else
-    checks::warn "KZG params file missing (DA workloads will fail); run: scripts/run/run-examples.sh <mode> (auto) or scripts/setup/setup-nomos-circuits.sh"
+    checks::warn "KZG params file missing (DA workloads will fail); run: scripts/run/run-examples.sh <mode> (auto) or scripts/setup/setup-logos-blockchain-circuits.sh"
   fi
 }
 

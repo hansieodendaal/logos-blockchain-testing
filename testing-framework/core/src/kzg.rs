@@ -35,8 +35,8 @@ impl KzgMode {
 pub struct KzgParamsSpec {
     pub mode: KzgMode,
     /// Value written into node configs (cfgsync `global_params_path`) and,
-    /// where applicable, exported as `NOMOS_KZGRS_PARAMS_PATH` for node
-    /// processes.
+    /// where applicable, exported as `LOGOS_BLOCKCHAIN_KZGRS_PARAMS_PATH` for
+    /// node processes.
     pub node_params_path: String,
     /// Host directory that must exist when running in `HostPath` mode.
     pub host_params_dir: Option<PathBuf>,

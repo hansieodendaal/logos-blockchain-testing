@@ -89,7 +89,7 @@ pub fn nomos_time_backend() -> Option<String> {
 
 #[must_use]
 pub fn nomos_kzgrs_params_path() -> Option<String> {
-    env::var("NOMOS_KZGRS_PARAMS_PATH").ok()
+    env::var("LOGOS_BLOCKCHAIN_KZGRS_PARAMS_PATH").ok()
 }
 
 #[must_use]
