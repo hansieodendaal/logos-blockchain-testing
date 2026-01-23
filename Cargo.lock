@@ -7088,12 +7088,16 @@ name = "testing-framework-runner-local"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "logos-blockchain-executor",
  "logos-blockchain-libp2p",
+ "logos-blockchain-network-service",
+ "logos-blockchain-node",
  "logos-blockchain-utils",
  "rand 0.8.5",
  "testing-framework-config",
  "testing-framework-core",
  "thiserror 2.0.17",
+ "tokio",
  "tracing",
 ]
 

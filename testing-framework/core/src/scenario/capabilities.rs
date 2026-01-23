@@ -22,11 +22,30 @@ pub struct ObservabilityCapability {
     pub grafana_url: Option<Url>,
 }
 
+/// Peer selection strategy for dynamically started nodes.
+#[derive(Clone, Debug)]
+pub enum PeerSelection {
+    /// Use the topology default (star/chain/full).
+    DefaultLayout,
+    /// Start without any initial peers.
+    None,
+    /// Connect to the named peers.
+    Named(Vec<String>),
+}
+
 /// Options for dynamically starting a node.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct StartNodeOptions {
-    /// Names of nodes to connect to on startup (implementation-defined).
-    pub peer_names: Vec<String>,
+    /// How to select initial peers on startup.
+    pub peers: PeerSelection,
+}
+
+impl Default for StartNodeOptions {
+    fn default() -> Self {
+        Self {
+            peers: PeerSelection::DefaultLayout,
+        }
+    }
 }
 
 /// Trait implemented by scenario capability markers to signal whether node
@@ -76,6 +95,10 @@ pub trait NodeControlHandle: Send + Sync {
         _options: StartNodeOptions,
     ) -> Result<StartedNode, DynError> {
         Err("start_executor_with not supported by this deployer".into())
+    }
+
+    fn node_client(&self, _name: &str) -> Option<ApiClient> {
+        None
     }
 }
 
