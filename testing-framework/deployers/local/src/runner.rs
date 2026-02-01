@@ -7,7 +7,11 @@ use testing_framework_core::{
         BlockFeed, BlockFeedTask, Deployer, DynError, Metrics, NodeClients, NodeControlCapability,
         RunContext, Runner, Scenario, ScenarioError, spawn_block_feed,
     },
-    topology::{config::TopologyConfig, deployment::Topology, readiness::ReadinessError},
+    topology::{
+        config::{TopologyBuilder, TopologyConfig},
+        deployment::Topology,
+        readiness::ReadinessError,
+    },
 };
 use thiserror::Error;
 use tracing::{debug, info};
@@ -165,6 +169,14 @@ impl LocalDeployer {
         config: TopologyConfig,
     ) -> Result<LocalManualCluster, ManualClusterError> {
         LocalManualCluster::from_config(config)
+    }
+
+    /// Build a manual cluster from a pre-configured topology builder.
+    pub fn manual_cluster_with_builder(
+        &self,
+        builder: TopologyBuilder,
+    ) -> Result<LocalManualCluster, ManualClusterError> {
+        LocalManualCluster::from_builder(builder)
     }
 
     async fn prepare_topology<Caps>(

@@ -32,16 +32,22 @@ pub struct LocalManualCluster {
 }
 
 impl LocalManualCluster {
-    pub(crate) fn from_config(config: TopologyConfig) -> Result<Self, ManualClusterError> {
-        let builder = TopologyBuilder::new(config);
+    pub(crate) fn from_builder(builder: TopologyBuilder) -> Result<Self, ManualClusterError> {
         let descriptors = builder
             .build()
             .map_err(|source| ManualClusterError::Build { source })?;
+
         let nodes = LocalNodeManager::new(
             descriptors,
             testing_framework_core::scenario::NodeClients::default(),
         );
+
         Ok(Self { nodes })
+    }
+
+    pub(crate) fn from_config(config: TopologyConfig) -> Result<Self, ManualClusterError> {
+        let builder = TopologyBuilder::new(config);
+        Self::from_builder(builder)
     }
 
     #[must_use]
