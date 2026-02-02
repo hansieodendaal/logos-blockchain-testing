@@ -1,8 +1,13 @@
-use std::{collections::HashSet, num::NonZeroUsize, path::PathBuf, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    num::NonZeroUsize,
+    path::PathBuf,
+    time::Duration,
+};
 
-use chain_leader::LeaderConfig as ChainLeaderConfig;
 use chain_network::{BootstrapConfig as ChainBootstrapConfig, OrphanConfig, SyncConfig};
 use chain_service::StartingState;
+use key_management_system_service::keys::Key;
 use nomos_api::ApiServiceSettings;
 use nomos_node::{
     api::backend::AxumBackendSettings as NodeAxumBackendSettings,
@@ -22,7 +27,7 @@ use nomos_node::{
 };
 use nomos_wallet::WalletServiceSettings;
 
-use crate::{timeouts, topology::configs::GeneralConfig};
+use crate::{nodes::kms::key_id_for_preload_backend, timeouts, topology::configs::GeneralConfig};
 
 // Configuration constants
 const CRYPTARCHIA_GOSSIPSUB_PROTOCOL: &str = "/cryptarchia/proto";
@@ -37,7 +42,11 @@ const API_MAX_CONCURRENT_REQUESTS: usize = 1000;
 pub(crate) fn cryptarchia_deployment(config: &GeneralConfig) -> CryptarchiaDeploymentSettings {
     CryptarchiaDeploymentSettings {
         epoch_config: config.consensus_config.ledger_config.epoch_config,
-        consensus_config: config.consensus_config.ledger_config.consensus_config,
+        security_param: config
+            .consensus_config
+            .ledger_config
+            .consensus_config
+            .security_param(),
         sdp_config: DeploymentSdpConfig {
             service_params: config
                 .consensus_config
@@ -93,10 +102,6 @@ pub(crate) fn cryptarchia_config(config: &GeneralConfig) -> CryptarchiaConfig {
                     max_orphan_cache_size: MAX_ORPHAN_CACHE_SIZE,
                 },
             },
-        },
-        leader: ChainLeaderConfig {
-            pk: config.consensus_config.leader_config.pk,
-            sk: config.consensus_config.leader_config.sk.clone(),
         },
     }
 }
@@ -160,19 +165,19 @@ fn wallet_settings_with_leader(
     config: &GeneralConfig,
     include_leader: bool,
 ) -> WalletServiceSettings {
-    let mut keys = HashSet::new();
+    let mut keys = HashMap::new();
 
     if include_leader {
-        keys.insert(config.consensus_config.leader_config.pk);
+        let leader_key = Key::Zk(config.consensus_config.leader_sk.clone().into());
+        let leader_key_id = key_id_for_preload_backend(&leader_key);
+        keys.insert(leader_key_id, config.consensus_config.leader_pk);
     }
 
-    keys.extend(
-        config
-            .consensus_config
-            .wallet_accounts
-            .iter()
-            .map(crate::topology::configs::wallet::WalletAccount::public_key),
-    );
+    for account in &config.consensus_config.wallet_accounts {
+        let key = Key::Zk(account.secret_key.clone());
+        let key_id = key_id_for_preload_backend(&key);
+        keys.insert(key_id, account.public_key());
+    }
 
     WalletServiceSettings { known_keys: keys }
 }
