@@ -38,6 +38,12 @@ pub fn create_kms_configs(
                     )),
                     Key::Zk(consensus_conf.leader_sk.clone().into()),
                 ),
+                (
+                    hex::encode(fr_to_bytes(
+                        consensus_conf.funding_sk.to_public_key().as_fr(),
+                    )),
+                    Key::Zk(consensus_conf.funding_sk.clone()),
+                ),
             ]);
 
             for account in wallet_accounts {

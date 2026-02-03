@@ -78,9 +78,7 @@ pub(crate) fn cryptarchia_config(config: &GeneralConfig) -> CryptarchiaConfig {
             starting_state: StartingState::Genesis {
                 genesis_tx: config.consensus_config.genesis_tx.clone(),
             },
-            // Disable on-disk recovery in compose tests to avoid serde errors on
-            // non-string keys and keep services alive.
-            recovery_file: PathBuf::new(),
+            recovery_file: PathBuf::from("recovery/cryptarchia.json"),
             bootstrap: chain_service::BootstrapConfig {
                 prolonged_bootstrap_period: config.bootstrapping_config.prolonged_bootstrap_period,
                 force_bootstrap: false,
@@ -122,8 +120,7 @@ pub(crate) fn time_config(config: &GeneralConfig) -> TimeConfig {
 
 pub(crate) fn mempool_config() -> nomos_node::config::mempool::serde::Config {
     nomos_node::config::mempool::serde::Config {
-        // Disable mempool recovery for hermetic tests.
-        recovery_path: PathBuf::new(),
+        recovery_path: PathBuf::from("recovery/mempool.json"),
     }
 }
 
@@ -173,11 +170,22 @@ fn wallet_settings_with_leader(
         keys.insert(leader_key_id, config.consensus_config.leader_pk);
     }
 
-    for account in &config.consensus_config.wallet_accounts {
-        let key = Key::Zk(account.secret_key.clone());
-        let key_id = key_id_for_preload_backend(&key);
-        keys.insert(key_id, account.public_key());
-    }
+    let funding_key = Key::Zk(config.consensus_config.funding_sk.clone());
+    let funding_key_id = key_id_for_preload_backend(&funding_key);
+    keys.insert(
+        funding_key_id,
+        config.consensus_config.funding_sk.to_public_key(),
+    );
 
-    WalletServiceSettings { known_keys: keys }
+    // Note: wallet accounts are used by the transaction workload directly and
+    // don't need to be registered for leader eligibility.
+
+    let voucher_master_key_id =
+        key_id_for_preload_backend(&Key::Zk(config.consensus_config.leader_sk.clone().into()));
+
+    WalletServiceSettings {
+        known_keys: keys,
+        voucher_master_key_id,
+        recovery_path: PathBuf::from("recovery/wallet.json"),
+    }
 }

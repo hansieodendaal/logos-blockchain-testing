@@ -48,7 +48,7 @@ pub struct ConsensusParams {
 }
 
 impl ConsensusParams {
-    const DEFAULT_ACTIVE_SLOT_COEFF: f64 = 0.9;
+    const DEFAULT_ACTIVE_SLOT_COEFF: f64 = 1.0;
     const CONSENSUS_ACTIVE_SLOT_COEFF_VAR: &str = "CONSENSUS_ACTIVE_SLOT_COEFF";
 
     #[must_use]
@@ -115,7 +115,7 @@ pub struct ServiceNote {
     pub output_index: usize,
 }
 
-fn create_genesis_tx(utxos: &[Utxo]) -> Result<GenesisTx, ConsensusConfigError> {
+fn create_genesis_tx(utxos: &mut [Utxo]) -> Result<GenesisTx, ConsensusConfigError> {
     // Create a genesis inscription op (similar to config.yaml)
     let inscription = InscriptionOp {
         channel_id: ChannelId::from([0; 32]),
@@ -131,6 +131,12 @@ fn create_genesis_tx(utxos: &[Utxo]) -> Result<GenesisTx, ConsensusConfigError> 
     // Create ledger transaction with the utxos as outputs
     let outputs: Vec<Note> = utxos.iter().map(|u| u.note).collect();
     let ledger_tx = LedgerTx::new(vec![], outputs);
+    let ledger_tx_hash = ledger_tx.hash();
+
+    // Ensure utxo IDs match the ledger tx hash used at genesis.
+    for utxo in utxos {
+        utxo.tx_hash = ledger_tx_hash;
+    }
 
     // Create the mantle transaction
     let mantle_tx = MantleTx {
@@ -215,8 +221,8 @@ pub fn create_consensus_configs(
         &mut blend_notes,
         &mut sdp_notes,
     );
-    let utxos = append_wallet_utxos(utxos, wallet);
-    let genesis_tx = create_genesis_tx(&utxos)?;
+    let mut utxos = append_wallet_utxos(utxos, wallet);
+    let genesis_tx = create_genesis_tx(&mut utxos)?;
     let ledger_config = build_ledger_config(consensus_params)?;
 
     Ok(leader_keys
@@ -276,7 +282,7 @@ fn push_leader_utxo(
     let pk = sk.to_public_key();
     leader_keys.push((pk, sk));
     utxos.push(Utxo {
-        note: Note::new(1_000, pk),
+        note: Note::new(100_000, pk),
         tx_hash: BigUint::from(0u8).into(),
         output_index,
     });

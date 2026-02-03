@@ -120,6 +120,10 @@ fn build_kms_config_for_node(
             key_id_for_preload_backend(&Key::Zk(consensus_config.leader_sk.clone().into())),
             Key::Zk(consensus_config.leader_sk.clone().into()),
         ),
+        (
+            key_id_for_preload_backend(&Key::Zk(consensus_config.funding_sk.clone())),
+            Key::Zk(consensus_config.funding_sk.clone()),
+        ),
     ]);
 
     for account in &wallet_config.accounts {
