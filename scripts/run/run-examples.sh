@@ -302,7 +302,7 @@ run_examples::bundle_matches_expected() {
   local tar_path="$1"
   [ -f "${tar_path}" ] || return 1
   [ -z "${LOGOS_BLOCKCHAIN_NODE_REV:-}" ] && return 0
-  local expected_features="${RUN_EXAMPLES_EXPECTED_BUNDLE_FEATURES:-all,pol-dev-mode,verification-keys}"
+  local expected_features="${RUN_EXAMPLES_EXPECTED_BUNDLE_FEATURES:-all,high-active-slot-coefficient,verification-keys}"
 
   local meta tar_rev tar_head tar_features
   meta="$(tar -xOzf "${tar_path}" artifacts/nomos-bundle-meta.env 2>/dev/null || true)"

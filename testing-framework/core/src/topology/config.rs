@@ -220,7 +220,11 @@ impl TopologyBuilder {
         let genesis_tx = create_consensus_genesis_tx(first_consensus, providers)?;
         apply_consensus_genesis_tx(&mut consensus_configs, &genesis_tx);
 
-        let kms_configs = create_kms_configs(&blend_configs, &config.wallet_config.accounts);
+        let kms_configs = create_kms_configs(
+            &blend_configs,
+            &consensus_configs,
+            &config.wallet_config.accounts,
+        );
 
         let nodes = build_node_descriptors(
             &config,
