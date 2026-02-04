@@ -75,7 +75,13 @@ pub struct NodeHandle<T> {
 }
 
 impl<T> NodeHandle<T> {
-    pub fn new(child: Child, tempdir: TempDir, config: T, api: ApiClient, persist_dir: Option<PathBuf>) -> Self {
+    pub fn new(
+        child: Child,
+        tempdir: TempDir,
+        config: T,
+        api: ApiClient,
+        persist_dir: Option<PathBuf>,
+    ) -> Self {
         Self {
             child,
             tempdir,
@@ -171,7 +177,13 @@ where
 
     let child = spawn_node_process(&binary_path, &config_path, dir.path())?;
 
-    let mut handle = NodeHandle::new(child, dir, config, ApiClient::new(addr, testing_addr), persist_dir);
+    let mut handle = NodeHandle::new(
+        child,
+        dir,
+        config,
+        ApiClient::new(addr, testing_addr),
+        persist_dir,
+    );
 
     // Wait for readiness via consensus_info
     let ready = wait_for_consensus_readiness(&handle.api).await;

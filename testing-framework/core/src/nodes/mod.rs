@@ -30,26 +30,30 @@ fn persist_tempdir(tempdir: &mut TempDir, label: &str) -> std::io::Result<()> {
     Ok(())
 }
 
-pub(crate) fn persist_tempdir_to(tempdir: &mut TempDir, target_dir: &std::path::Path, label: &str) -> std::io::Result<()> {
+pub(crate) fn persist_tempdir_to(
+    tempdir: &mut TempDir,
+    target_dir: &std::path::Path,
+    label: &str,
+) -> std::io::Result<()> {
     use std::fs;
-    
+
     println!(
         "{}: persisting directory from {} to {}",
         label,
         tempdir.path().display(),
         target_dir.display()
     );
-    
+
     // Create parent directory if it doesn't exist
     if let Some(parent) = target_dir.parent() {
         fs::create_dir_all(parent)?;
     }
-    
+
     // Copy tempdir contents to target directory
     if target_dir.exists() {
         fs::remove_dir_all(target_dir)?;
     }
-    
+
     // Use a helper function to recursively copy
     fn copy_dir_all(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
         use std::fs;
@@ -65,9 +69,9 @@ pub(crate) fn persist_tempdir_to(tempdir: &mut TempDir, target_dir: &std::path::
         }
         Ok(())
     }
-    
+
     copy_dir_all(tempdir.path(), target_dir)?;
-    
+
     Ok(())
 }
 

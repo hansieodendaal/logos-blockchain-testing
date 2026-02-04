@@ -250,8 +250,13 @@ impl LocalDynamicNodes {
         let api_client = match role {
             NodeRole::Validator => {
                 let config = create_validator_config(general_config);
-                self.spawn_and_register_validator(&node_name, network_port, config, options.persist_dir)
-                    .await?
+                self.spawn_and_register_validator(
+                    &node_name,
+                    network_port,
+                    config,
+                    options.persist_dir,
+                )
+                .await?
             }
         };
 
