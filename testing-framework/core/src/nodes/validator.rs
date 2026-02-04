@@ -5,7 +5,7 @@ use nomos_tracing_service::LoggerLayer;
 pub use testing_framework_config::nodes::validator::create_validator_config;
 use tracing::{debug, info};
 
-use super::{persist_tempdir, should_persist_tempdir};
+use super::{persist_tempdir, persist_tempdir_to, should_persist_tempdir};
 use crate::{
     IS_DEBUG_TRACING,
     nodes::{
@@ -49,10 +49,15 @@ impl Deref for Validator {
 
 impl Drop for Validator {
     fn drop(&mut self) {
-        if should_persist_tempdir()
-            && let Err(e) = persist_tempdir(&mut self.handle.tempdir, "logos-blockchain-node")
-        {
-            debug!(error = ?e, "failed to persist validator tempdir");
+        // Check if we have a custom persist_dir
+        if let Some(ref persist_dir) = self.handle.persist_dir {
+            if let Err(e) = persist_tempdir_to(&mut self.handle.tempdir, persist_dir, "logos-blockchain-node") {
+                debug!(error = ?e, persist_dir = %persist_dir.display(), "failed to persist validator tempdir to custom directory");
+            }
+        } else if should_persist_tempdir() {
+            if let Err(e) = persist_tempdir(&mut self.handle.tempdir, "logos-blockchain-node") {
+                debug!(error = ?e, "failed to persist validator tempdir");
+            }
         }
 
         debug!("stopping validator process");
@@ -72,7 +77,7 @@ impl Validator {
         self.handle.wait_for_exit(timeout).await
     }
 
-    pub async fn spawn(config: Config, label: &str) -> Result<Self, SpawnNodeError> {
+    pub async fn spawn(config: Config, label: &str, persist_dir: Option<PathBuf>) -> Result<Self, SpawnNodeError> {
         let log_prefix = format!("{LOGS_PREFIX}-{label}");
         let handle = spawn_node(
             config,
@@ -80,6 +85,7 @@ impl Validator {
             "validator.yaml",
             binary_path(),
             !*IS_DEBUG_TRACING,
+            persist_dir,
         )
         .await?;
 

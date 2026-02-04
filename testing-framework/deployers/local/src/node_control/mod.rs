@@ -250,7 +250,7 @@ impl LocalDynamicNodes {
         let api_client = match role {
             NodeRole::Validator => {
                 let config = create_validator_config(general_config);
-                self.spawn_and_register_validator(&node_name, network_port, config)
+                self.spawn_and_register_validator(&node_name, network_port, config, options.persist_dir)
                     .await?
             }
         };
@@ -267,8 +267,9 @@ impl LocalDynamicNodes {
         node_name: &str,
         network_port: u16,
         config: ValidatorConfig,
+        persist_dir: Option<std::path::PathBuf>,
     ) -> Result<ApiClient, LocalDynamicError> {
-        let node = Validator::spawn(config, node_name)
+        let node = Validator::spawn(config, node_name, persist_dir)
             .await
             .map_err(|source| LocalDynamicError::Spawn { source })?;
         let client = node.api().clone();

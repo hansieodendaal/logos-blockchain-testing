@@ -73,7 +73,7 @@ impl Topology {
         for i in 0..n_validators {
             let config = create_validator_config(config[i].clone());
             let label = format!("validator-{i}");
-            validators.push(Validator::spawn(config, &label).await?);
+            validators.push(Validator::spawn(config, &label, None).await?);
         }
 
         Ok(validators)

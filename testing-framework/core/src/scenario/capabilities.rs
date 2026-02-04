@@ -38,12 +38,15 @@ pub enum PeerSelection {
 pub struct StartNodeOptions {
     /// How to select initial peers on startup.
     pub peers: PeerSelection,
+    /// Optional directory to persist node's tempdir to on stop.
+    pub persist_dir: Option<std::path::PathBuf>,
 }
 
 impl Default for StartNodeOptions {
     fn default() -> Self {
         Self {
             peers: PeerSelection::DefaultLayout,
+            persist_dir: None,
         }
     }
 }

@@ -85,6 +85,7 @@ impl Workload for JoinNodeWithPeersWorkload {
 
         let options = StartNodeOptions {
             peers: PeerSelection::Named(self.peers.clone()),
+            persist_dir: None,
         };
         let node = handle.start_validator_with(&self.name, options).await?;
         let client = node.api;
