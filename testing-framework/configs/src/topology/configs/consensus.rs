@@ -246,17 +246,32 @@ pub fn create_consensus_configs(
 }
 
 fn leader_stake_amount(wallet: &WalletConfig, n_participants: usize) -> u64 {
+    // Minimum leader stake (legacy baseline) so small test wallets still
+    // have a viable leader in low-fund scenarios.
+    const MIN_LEADER_STAKE: u64 = 100_000;
+
+    // Leader stake multiplier relative to average wallet allocation per validator.
+    // Keeps the leader stake competitive when wallet-funded UTXOs dominate total
+    // stake.
+    const LEADER_STAKE_MULTIPLIER: u64 = 10;
+
     let total_wallet_funds: u64 = wallet.accounts.iter().map(|account| account.value).sum();
     if total_wallet_funds == 0 {
-        return 100_000;
+        return MIN_LEADER_STAKE;
     }
 
     let n = n_participants.max(1) as u64;
+
+    // Scale leader stake to stay competitive with large wallet-funded UTXOs.
+    // We use LEADER_STAKE_MULTIPLIER × (total_wallet_funds / n) to keep
+    // block production likely even when wallets dominate total stake.
     let scaled = total_wallet_funds
-        .saturating_mul(10)
+        .saturating_mul(LEADER_STAKE_MULTIPLIER)
         .saturating_div(n)
         .max(1);
-    scaled.max(100_000)
+
+    // Floor to preserve the prior baseline leader stake and avoid too-small values.
+    scaled.max(MIN_LEADER_STAKE)
 }
 
 fn create_utxos_for_leader_and_services(
