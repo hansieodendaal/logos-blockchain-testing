@@ -5,7 +5,6 @@ use std::{
     sync::Arc,
 };
 
-use chain_leader::LeaderConfig;
 use cryptarchia_engine::EpochConfig;
 use groth16::CompressedGroth16Proof;
 use key_management_system_service::keys::{
@@ -13,7 +12,7 @@ use key_management_system_service::keys::{
 };
 use nomos_core::{
     mantle::{
-        MantleTx, Note, OpProof, Utxo,
+        GenesisTx as GenesisTxTrait, MantleTx, Note, OpProof, Utxo,
         genesis_tx::GenesisTx,
         ledger::Tx as LedgerTx,
         ops::{
@@ -39,6 +38,8 @@ pub enum ConsensusConfigError {
     LedgerConfig { message: String },
     #[error("failed to sign genesis declarations: {message}")]
     DeclarationSignature { message: String },
+    #[error("genesis ledger is missing expected utxo note: {note}")]
+    MissingGenesisUtxo { note: String },
 }
 
 #[derive(Clone)]
@@ -49,7 +50,7 @@ pub struct ConsensusParams {
 }
 
 impl ConsensusParams {
-    const DEFAULT_ACTIVE_SLOT_COEFF: f64 = 0.9;
+    const DEFAULT_ACTIVE_SLOT_COEFF: f64 = 1.0;
     const CONSENSUS_ACTIVE_SLOT_COEFF_VAR: &str = "CONSENSUS_ACTIVE_SLOT_COEFF";
 
     #[must_use]
@@ -98,7 +99,8 @@ impl ProviderInfo {
 /// be converted into a specific service or services configuration.
 #[derive(Clone)]
 pub struct GeneralConsensusConfig {
-    pub leader_config: LeaderConfig,
+    pub leader_pk: ZkPublicKey,
+    pub leader_sk: UnsecuredZkKey,
     pub ledger_config: nomos_ledger::Config,
     pub genesis_tx: GenesisTx,
     pub utxos: Vec<Utxo>,
@@ -115,7 +117,7 @@ pub struct ServiceNote {
     pub output_index: usize,
 }
 
-fn create_genesis_tx(utxos: &[Utxo]) -> Result<GenesisTx, ConsensusConfigError> {
+fn create_genesis_tx(utxos: &mut [Utxo]) -> Result<GenesisTx, ConsensusConfigError> {
     // Create a genesis inscription op (similar to config.yaml)
     let inscription = InscriptionOp {
         channel_id: ChannelId::from([0; 32]),
@@ -131,6 +133,12 @@ fn create_genesis_tx(utxos: &[Utxo]) -> Result<GenesisTx, ConsensusConfigError> 
     // Create ledger transaction with the utxos as outputs
     let outputs: Vec<Note> = utxos.iter().map(|u| u.note).collect();
     let ledger_tx = LedgerTx::new(vec![], outputs);
+    let ledger_tx_hash = ledger_tx.hash();
+
+    // Ensure utxo IDs match the ledger tx hash used at genesis.
+    for utxo in utxos {
+        utxo.tx_hash = ledger_tx_hash;
+    }
 
     // Create the mantle transaction
     let mantle_tx = MantleTx {
@@ -160,10 +168,10 @@ fn build_ledger_config(
             epoch_period_nonce_buffer: unsafe { NonZero::new_unchecked(3) },
             epoch_period_nonce_stabilization: unsafe { NonZero::new_unchecked(4) },
         },
-        consensus_config: cryptarchia_engine::Config {
-            security_param: consensus_params.security_param,
-            active_slot_coeff: consensus_params.active_slot_coeff,
-        },
+        consensus_config: cryptarchia_engine::Config::new(
+            consensus_params.security_param,
+            consensus_params.active_slot_coeff,
+        ),
         sdp_config: nomos_ledger::mantle::sdp::Config {
             service_params: Arc::new(
                 [(
@@ -192,6 +200,7 @@ fn build_ledger_config(
                     })?,
                     num_blend_layers: unsafe { NonZeroU64::new_unchecked(3) },
                     minimum_network_size: unsafe { NonZeroU64::new_unchecked(1) },
+                    data_replication_factor: 0,
                 },
             },
         },
@@ -208,21 +217,24 @@ pub fn create_consensus_configs(
     let mut blend_notes = Vec::new();
     let mut sdp_notes = Vec::new();
 
+    let leader_stake = leader_stake_amount(wallet, ids.len());
     let utxos = create_utxos_for_leader_and_services(
         ids,
         &mut leader_keys,
         &mut blend_notes,
         &mut sdp_notes,
+        leader_stake,
     );
-    let utxos = append_wallet_utxos(utxos, wallet);
-    let genesis_tx = create_genesis_tx(&utxos)?;
+    let mut utxos = append_wallet_utxos(utxos, wallet);
+    let genesis_tx = create_genesis_tx(&mut utxos)?;
     let ledger_config = build_ledger_config(consensus_params)?;
 
     Ok(leader_keys
         .into_iter()
         .enumerate()
         .map(|(i, (pk, sk))| GeneralConsensusConfig {
-            leader_config: LeaderConfig { pk, sk },
+            leader_pk: pk,
+            leader_sk: sk,
             ledger_config: ledger_config.clone(),
             genesis_tx: genesis_tx.clone(),
             utxos: utxos.clone(),
@@ -233,20 +245,48 @@ pub fn create_consensus_configs(
         .collect())
 }
 
+fn leader_stake_amount(wallet: &WalletConfig, n_participants: usize) -> u64 {
+    // Minimum leader stake (legacy baseline) so small test wallets still
+    // have a viable leader in low-fund scenarios.
+    const MIN_LEADER_STAKE: u64 = 100_000;
+
+    // Leader stake multiplier relative to average wallet allocation per validator.
+    // Keeps the leader stake competitive when wallet-funded UTXOs dominate total
+    // stake.
+    const LEADER_STAKE_MULTIPLIER: u64 = 10;
+
+    let total_wallet_funds: u64 = wallet.accounts.iter().map(|account| account.value).sum();
+    if total_wallet_funds == 0 {
+        return MIN_LEADER_STAKE;
+    }
+
+    let n = n_participants.max(1) as u64;
+
+    // Scale leader stake to stay competitive with large wallet-funded UTXOs.
+    // We use LEADER_STAKE_MULTIPLIER × (total_wallet_funds / n) to keep
+    // block production likely even when wallets dominate total stake.
+    let scaled = total_wallet_funds
+        .saturating_mul(LEADER_STAKE_MULTIPLIER)
+        .saturating_div(n)
+        .max(1);
+
+    // Floor to preserve the prior baseline leader stake and avoid too-small values.
+    scaled.max(MIN_LEADER_STAKE)
+}
+
 fn create_utxos_for_leader_and_services(
     ids: &[[u8; 32]],
     leader_keys: &mut Vec<(ZkPublicKey, UnsecuredZkKey)>,
     blend_notes: &mut Vec<ServiceNote>,
     sdp_notes: &mut Vec<ServiceNote>,
+    leader_stake: u64,
 ) -> Vec<Utxo> {
     let mut utxos = Vec::new();
 
-    // Assume output index which will be set by the ledger tx.
-    let mut output_index = 0;
-
     // Create notes for leader, Blend and DA declarations.
+    let mut output_index = 0;
     for &id in ids {
-        output_index = push_leader_utxo(id, leader_keys, &mut utxos, output_index);
+        output_index = push_leader_utxo(id, leader_keys, &mut utxos, output_index, leader_stake);
         output_index = push_service_note(b"bn", id, blend_notes, &mut utxos, output_index);
         output_index = push_service_note(b"sdp", id, sdp_notes, &mut utxos, output_index);
     }
@@ -270,15 +310,16 @@ fn push_leader_utxo(
     leader_keys: &mut Vec<(ZkPublicKey, UnsecuredZkKey)>,
     utxos: &mut Vec<Utxo>,
     output_index: usize,
+    leader_stake: u64,
 ) -> usize {
     let sk_data = derive_key_material(b"ld", &id);
     let sk = UnsecuredZkKey::from(BigUint::from_bytes_le(&sk_data));
     let pk = sk.to_public_key();
     leader_keys.push((pk, sk));
     utxos.push(Utxo {
-        note: Note::new(1_000, pk),
+        note: Note::new(leader_stake, pk),
         tx_hash: BigUint::from(0u8).into(),
-        output_index: 0,
+        output_index,
     });
     output_index + 1
 }
@@ -303,17 +344,18 @@ fn push_service_note(
     utxos.push(Utxo {
         note,
         tx_hash: BigUint::from(0u8).into(),
-        output_index: 0,
+        output_index,
     });
     output_index + 1
 }
 
 fn append_wallet_utxos(mut utxos: Vec<Utxo>, wallet: &WalletConfig) -> Vec<Utxo> {
     for account in &wallet.accounts {
+        let output_index = utxos.len();
         utxos.push(Utxo {
             note: Note::new(account.value, account.public_key()),
             tx_hash: BigUint::from(0u8).into(),
-            output_index: 0,
+            output_index,
         });
     }
 
@@ -419,4 +461,26 @@ fn build_genesis_tx(
     GenesisTx::from_tx(signed_mantle_tx).map_err(|err| ConsensusConfigError::GenesisTx {
         message: err.to_string(),
     })
+}
+
+pub fn sync_utxos_with_genesis(
+    utxos: &mut [Utxo],
+    genesis_tx: &GenesisTx,
+) -> Result<(), ConsensusConfigError> {
+    let ledger_tx = genesis_tx.mantle_tx().ledger_tx.clone();
+    let ledger_tx_hash = ledger_tx.hash();
+    let outputs = &ledger_tx.outputs;
+
+    for utxo in utxos {
+        let output_index = outputs
+            .iter()
+            .position(|note| note == &utxo.note)
+            .ok_or_else(|| ConsensusConfigError::MissingGenesisUtxo {
+                note: format!("{:?}", utxo.note),
+            })?;
+        utxo.output_index = output_index;
+        utxo.tx_hash = ledger_tx_hash;
+    }
+
+    Ok(())
 }
