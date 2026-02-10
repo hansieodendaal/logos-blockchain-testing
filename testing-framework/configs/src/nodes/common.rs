@@ -29,6 +29,7 @@ use lb_node::{
     },
 };
 use lb_wallet_service::WalletServiceSettings;
+use time::OffsetDateTime;
 
 use crate::{nodes::kms::key_id_for_preload_backend, timeouts, topology::configs::GeneralConfig};
 
@@ -80,6 +81,7 @@ pub(crate) fn cryptarchia_deployment(config: &GeneralConfig) -> CryptarchiaDeplo
 pub(crate) fn time_deployment(config: &GeneralConfig) -> TimeDeploymentSettings {
     TimeDeploymentSettings {
         slot_duration: config.time_config.slot_duration,
+        chain_start_time: OffsetDateTime::now_utc(),
     }
 }
 
@@ -134,7 +136,6 @@ pub(crate) fn time_config(config: &GeneralConfig) -> TimeConfig {
             },
             update_interval: config.time_config.update_interval,
         },
-        chain_start_time: config.time_config.chain_start_time,
     }
 }
 
