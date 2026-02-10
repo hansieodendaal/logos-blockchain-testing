@@ -211,13 +211,13 @@ fn write_deployment_config_if_present(config_path: &Path) -> io::Result<()> {
     let config_contents = fs::read_to_string(config_path)?;
     let yaml_value: Value = serde_yaml::from_str(&config_contents).map_err(io::Error::other)?;
 
-    let Some(root) = yaml_value.as_mapping() else {
+    let Value::Mapping(mut root) = yaml_value else {
         return Ok(());
     };
 
     let deployment_key = Value::String("deployment".into());
 
-    let Some(deployment) = root.get(&deployment_key) else {
+    let Some(deployment) = root.remove(&deployment_key) else {
         return Ok(());
     };
 
@@ -226,9 +226,12 @@ fn write_deployment_config_if_present(config_path: &Path) -> io::Result<()> {
     };
 
     let deployment_path = config_dir.join("deployment.yaml");
-    let deployment_contents = serde_yaml::to_string(deployment).map_err(io::Error::other)?;
+    let deployment_contents = serde_yaml::to_string(&deployment).map_err(io::Error::other)?;
+    fs::write(deployment_path, deployment_contents)?;
 
-    fs::write(deployment_path, deployment_contents)
+    let updated_config = Value::Mapping(root);
+    let updated_contents = serde_yaml::to_string(&updated_config).map_err(io::Error::other)?;
+    fs::write(config_path, updated_contents)
 }
 
 pub(crate) fn spawn_node_process(
