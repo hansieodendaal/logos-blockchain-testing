@@ -1,5 +1,5 @@
 use std::{
-    io,
+    fs, io,
     net::SocketAddr,
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
@@ -9,6 +9,7 @@ use std::{
 use lb_tracing_service::LoggerLayer;
 use reqwest::Url;
 use serde::Serialize;
+use serde_yaml::Value;
 use tempfile::TempDir;
 use tokio::time;
 use tracing::{debug, info};
@@ -194,7 +195,40 @@ fn write_node_config<C: Serialize>(config: &C, config_path: &Path) -> Result<(),
     .map_err(|source| SpawnNodeError::WriteConfig {
         path: config_path.to_path_buf(),
         source,
-    })
+    })?;
+
+    write_deployment_config_if_present(config_path).map_err(|source| {
+        SpawnNodeError::WriteConfig {
+            path: config_path.to_path_buf(),
+            source,
+        }
+    })?;
+
+    Ok(())
+}
+
+fn write_deployment_config_if_present(config_path: &Path) -> io::Result<()> {
+    let config_contents = fs::read_to_string(config_path)?;
+    let yaml_value: Value = serde_yaml::from_str(&config_contents).map_err(io::Error::other)?;
+
+    let Some(root) = yaml_value.as_mapping() else {
+        return Ok(());
+    };
+
+    let deployment_key = Value::String("deployment".into());
+
+    let Some(deployment) = root.get(&deployment_key) else {
+        return Ok(());
+    };
+
+    let Some(config_dir) = config_path.parent() else {
+        return Ok(());
+    };
+
+    let deployment_path = config_dir.join("deployment.yaml");
+    let deployment_contents = serde_yaml::to_string(deployment).map_err(io::Error::other)?;
+
+    fs::write(deployment_path, deployment_contents)
 }
 
 pub(crate) fn spawn_node_process(
@@ -202,9 +236,15 @@ pub(crate) fn spawn_node_process(
     config_path: &Path,
     workdir: &Path,
 ) -> Result<Child, SpawnNodeError> {
-    Command::new(binary_path)
-        .arg(config_path)
-        .current_dir(workdir)
+    let mut cmd = Command::new(binary_path);
+    cmd.arg(config_path);
+
+    let deployment_path = workdir.join("deployment.yaml");
+    if deployment_path.is_file() {
+        cmd.arg("--deployment").arg(deployment_path);
+    }
+
+    cmd.current_dir(workdir)
         .stdin(Stdio::null())
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
