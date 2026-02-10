@@ -8,7 +8,6 @@ use std::{
 use lb_api_service::ApiServiceSettings;
 use lb_chain_leader_service::LeaderWalletConfig;
 use lb_chain_network::{BootstrapConfig as ChainBootstrapConfig, OrphanConfig, SyncConfig};
-use lb_chain_service::StartingState;
 use lb_core::mantle::Value;
 use lb_key_management_system_service::keys::{Key, secured_key::SecuredKey};
 use lb_node::{
@@ -74,6 +73,7 @@ pub(crate) fn cryptarchia_deployment(config: &GeneralConfig) -> CryptarchiaDeplo
             min_stake: config.consensus_config.ledger_config.sdp_config.min_stake,
         },
         gossipsub_protocol: CRYPTARCHIA_GOSSIPSUB_PROTOCOL.to_owned(),
+        genesis_state: config.consensus_config.genesis_tx.clone(),
     }
 }
 
@@ -92,9 +92,6 @@ pub(crate) fn mempool_deployment() -> MempoolDeploymentSettings {
 pub(crate) fn cryptarchia_config(config: &GeneralConfig) -> CryptarchiaConfig {
     CryptarchiaConfig {
         service: CryptarchiaServiceConfig {
-            starting_state: StartingState::Genesis {
-                genesis_tx: config.consensus_config.genesis_tx.clone(),
-            },
             recovery_file: PathBuf::from("recovery/cryptarchia.json"),
             bootstrap: lb_chain_service::BootstrapConfig {
                 prolonged_bootstrap_period: config.bootstrapping_config.prolonged_bootstrap_period,
