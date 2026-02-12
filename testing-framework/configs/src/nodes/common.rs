@@ -2,6 +2,7 @@ use std::{
     collections::{HashMap, HashSet},
     num::NonZeroUsize,
     path::PathBuf,
+    sync::OnceLock,
     time::Duration,
 };
 
@@ -40,6 +41,12 @@ const STATE_RECORDING_INTERVAL_SECS: u64 = 60;
 const IBD_DOWNLOAD_DELAY_SECS: u64 = 10;
 const MAX_ORPHAN_CACHE_SIZE: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(5) };
 const API_MAX_CONCURRENT_REQUESTS: usize = 1000;
+
+static CHAIN_START_TIME: OnceLock<OffsetDateTime> = OnceLock::new();
+
+fn get_or_init_chain_start_time() -> OffsetDateTime {
+    *CHAIN_START_TIME.get_or_init(OffsetDateTime::now_utc)
+}
 
 pub(crate) fn cryptarchia_deployment(config: &GeneralConfig) -> CryptarchiaDeploymentSettings {
     let mantle_service_params = &config
@@ -81,7 +88,7 @@ pub(crate) fn cryptarchia_deployment(config: &GeneralConfig) -> CryptarchiaDeplo
 pub(crate) fn time_deployment(config: &GeneralConfig) -> TimeDeploymentSettings {
     TimeDeploymentSettings {
         slot_duration: config.time_config.slot_duration,
-        chain_start_time: OffsetDateTime::now_utc(),
+        chain_start_time: get_or_init_chain_start_time(),
     }
 }
 
